@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  go-service:
+    build:
+      context: ./go-service
+    ports:
+      - "8080:8080"
+
+  nestjs-service:
+    build:
+      context: ./nestjs-service
+    ports:
+      - "3000:3000"
+    depends_on:
+      - go-service

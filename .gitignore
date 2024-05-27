@@ -1,0 +1,8 @@
+/scratch
+scratch
+
+nestjs-service/node_modules
+/nestjs-service/node_modules
+nestjs-service/dist
+/nestjs-service/dist
+

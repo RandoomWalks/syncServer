@@ -25,6 +25,7 @@
 import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
 import { ChangeProcessorService } from '../change-processor/change-processor.service';
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
+import { GoClientService } from './go-client.service';
 
 @Controller('sync')
 export class SyncController {
@@ -33,7 +34,9 @@ export class SyncController {
     constructor(
         private readonly changeProcessorService: ChangeProcessorService,
         private readonly serverChangeTrackerService: ServerChangeTrackerService,
-    ) {}
+        private readonly goClientService: GoClientService,
+    ) { }
+
 
     @Post('client-changes')
     async receiveClientChanges(@Body() changes: any[]): Promise<any> {
@@ -66,5 +69,11 @@ export class SyncController {
             this.logger.error('Error retrieving server changes', error.stack);
             throw error;
         }
+    }
+
+
+    @Post('process')
+    async processData(@Body() body: { data: string[] }) {
+        return this.goClientService.syncData(body.data);
     }
 }

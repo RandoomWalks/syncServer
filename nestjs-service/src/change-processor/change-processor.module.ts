@@ -3,8 +3,8 @@ import { ChangeProcessorService } from './change-processor.service';
 import { DatabaseModule } from '../database/database.module';
 
 @Module({
-  imports: [DatabaseModule],
-  providers: [ChangeProcessorService],
-  exports: [ChangeProcessorService],
+    imports: [DatabaseModule],
+    providers: [ChangeProcessorService],
+    exports: [ChangeProcessorService],
 })
-export class ChangeProcessorModule {}
+export class ChangeProcessorModule { }

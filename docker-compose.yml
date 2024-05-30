@@ -1,4 +1,45 @@
-version: '3'
+# version: '3'
+
+# services:
+#   go-service:
+#     build:
+#       context: ./go-service
+#     ports:
+#       - "8080:8080"
+
+#   nestjs-service:
+#     build:
+#       context: ./nestjs-service
+#     ports:
+#       - "3000:3000"
+#     depends_on:
+#       - go-service
+
+
+# version: '3'
+
+# services:
+#   go-service:
+#     build:
+#       context: ./go-service
+#     ports:
+#       - "8080:8080"
+
+#   nestjs-service:
+#     build:
+#       context: ./nestjs-service
+#     ports:
+#       - "3000:3000"
+#     depends_on:
+#       - go-service
+#       - mongo
+
+#   mongo:
+#     image: mongo:latest
+#     ports:
+#       - "27017:27017"
+
+version: '3.8'
 
 services:
   go-service:
@@ -14,3 +55,17 @@ services:
       - "3000:3000"
     depends_on:
       - go-service
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/mydb
+
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

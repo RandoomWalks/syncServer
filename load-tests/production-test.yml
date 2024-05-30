@@ -1,0 +1,48 @@
+
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 120
+      arrivalRate: 50
+      name: "Ramp-up"
+    - duration: 600
+      arrivalRate: 200
+      name: "Sustained load"
+    - duration: 120
+      arrivalRate: 50
+      name: "Ramp-down"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+scenarios:
+  - flow:
+      - post:
+          url: "/sync/client-changes"
+          json:
+            changes: [
+              { type: 'create', data: { _id: 1, name: 'test1' } },
+              { type: 'update', data: { _id: 1, name: 'test1_updated' } },
+              { type: 'delete', data: { _id: 1 } }
+            ]
+      - get:
+          url: "/sync/server-changes"
+          qs: 
+            since: "{{ now }}"
+
+
+
+
+# ### Config Section:
+# - **Target:** Specifies the base URL of the API endpoint to be tested, in this case, `http://localhost:3000`.
+# - **Phases:** Describes the load testing phases, each with its duration and arrival rate.
+#   - **Ramp-up:** Gradually increases the load from 0 to 50 requests per second over a duration of 120 seconds.
+#   - **Sustained load:** Maintains a constant load of 200 requests per second for 600 seconds.
+#   - **Ramp-down:** Gradually decreases the load from 200 to 50 requests per second over a duration of 120 seconds.
+# - **Defaults:** Specifies default headers to be included in every request, in this case setting the `Content-Type` header to `application/json`.
+
+# ### Scenarios Section:
+# - **Flow:** Defines a sequence of HTTP requests to be executed in the load test scenario.
+#   - **POST Request:** Sends a POST request to the `/sync/client-changes` endpoint with a JSON payload containing an array of changes. These changes seem to simulate CRUD operations (`create`, `update`, `delete`) on some resource.
+#   - **GET Request:** Sends a GET request to the `/sync/server-changes` endpoint with query parameters `since` set to the current timestamp (`{{ now }}`). This request likely retrieves server-side changes since the specified timestamp.
+
+# Overall, this configuration sets up a load testing scenario where the load gradually ramps up, sustains at a constant rate, and then ramps down. During each phase, a series of POST and GET requests are made to the specified API endpoints, simulating client-side changes and fetching server-side changes.

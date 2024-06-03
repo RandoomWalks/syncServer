@@ -17,13 +17,12 @@ module.exports = {
     testEnvironment: 'node',
     testMatch: ['**/*.spec.ts'],
     moduleNameMapper: {
-      '^@/(.*)$': '<rootDir>/src/$1',
+        '^@/(.*)$': '<rootDir>/src/$1',
     },
     moduleDirectories: ['node_modules', 'src'],
-    globals: {
-      'ts-jest': {
-        tsconfig: 'tsconfig.json',
-      },
-    },
-  };
-  
+
+    transform: {
+        "^.+\\.tsx?$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+    }
+
+};

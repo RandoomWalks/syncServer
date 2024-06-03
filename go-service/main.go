@@ -1,10 +1,15 @@
 package main
 
 import (
+    "context"
     "encoding/json"
     "log"
     "net/http"
     "sync"
+    "os"
+    "os/signal"
+    "syscall"
+    "time"
 
     "go-service/handlers"
 )
@@ -23,6 +28,30 @@ func processData(data string, resultChan chan string, logPrefix string) {
     resultChan <- processedData
 }
 
+func handleGracefulShutdown(server *http.Server, timeout time.Duration, done chan bool) {
+    // Create a channel to receive OS signals
+    stop := make(chan os.Signal, 1)
+    signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+    // Block until a signal is received
+    <-stop
+
+    log.Println("Received termination signal, initiating graceful shutdown")
+
+    // Create a context with a timeout for the shutdown process
+    ctx, cancel := context.WithTimeout(context.Background(), timeout)
+    defer cancel()
+
+    // Attempt to gracefully shutdown the server
+    if err := server.Shutdown(ctx); err != nil {
+        log.Fatalf("Could not gracefully shutdown the server: %v\n", err)
+    }
+
+    log.Println("Server gracefully stopped")
+    close(done)
+}
+
+
 func syncHandler(w http.ResponseWriter, r *http.Request) {
     log.Println("Received request")
 
@@ -39,6 +68,7 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
     // Prepare to process data
     var wg sync.WaitGroup
     resultChan := make(chan string, len(req.Data))
+    // defer close(resultChan)
     logPrefix := "[syncHandler] "
 
     // Process each data item in a goroutine
@@ -74,10 +104,41 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
     log.Println("Response sent successfully")
 }
 
+
 func main() {
-    // http.HandleFunc("/sync", syncHandler)
+    // Create an HTTP server
+    server := &http.Server{
+        Addr:    ":8080",
+        Handler: http.DefaultServeMux,
+    }
+
+    // Register the handler
     http.HandleFunc("/sync", handlers.SyncHandler)
 
-    log.Println("Starting server on :8080")
-    log.Fatal(http.ListenAndServe(":8080", nil))
+    // Channel to signal the completion of shutdown
+    done := make(chan bool, 1)
+
+    // Start the server in a goroutine
+    go func() {
+        log.Println("Starting server on :8080")
+        if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("Could not listen on :8080: %v\n", err)
+        }
+    }()
+
+    // Handle graceful shutdown
+    handleGracefulShutdown(server, 5*time.Second, done)
+
+    // Block until graceful shutdown is complete
+    <-done
 }
+
+
+// func main() {
+//     // http.HandleFunc("/sync", syncHandler)
+//     http.HandleFunc("/sync", handlers.SyncHandler)
+
+//     log.Println("Starting server on :8080")
+//     log.Fatal(http.ListenAndServe(":8080", nil))
+// }
+

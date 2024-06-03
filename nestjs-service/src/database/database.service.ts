@@ -80,10 +80,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
-    async getDb(): Promise<Db> {
+    getDb(): Db {
         if (!this.db) {
-            this.logger.warn('Database connection not initialized, initializing now...');
-            await this.onModuleInit();
+            throw new Error('Database connection is not initialized.');
         }
         return this.db;
     }
@@ -100,3 +99,4 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         }
     }
 }
+

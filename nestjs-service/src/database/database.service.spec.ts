@@ -49,16 +49,15 @@
 //     });
 // });
 
-// database.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { MongoClient, Db } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import { DatabaseService } from './database.service';
-
 
 jest.mock('mongodb', () => {
   const mClient = {
     connect: jest.fn(),
     db: jest.fn().mockReturnThis(),
+    close: jest.fn(),
   };
   return { MongoClient: jest.fn(() => mClient) };
 });

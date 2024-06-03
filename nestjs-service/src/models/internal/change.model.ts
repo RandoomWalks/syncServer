@@ -7,3 +7,5 @@ export class Change {
     data: any;
     updatedAt: Date;
   }
+
+  // data: {_id: new ObjectId(),  }

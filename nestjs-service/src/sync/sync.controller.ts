@@ -61,12 +61,18 @@ export class SyncController {
 
     @Get('server-changes')
     async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
+        // parameter extracted from URL: ie https://example.com/api/items?since=2023-01-01T00:00:00Z
 
         this.logger.log('Received request for server changes');
         this.logger.debug(`Query parameter 'since': ${since}`);
 
+        const changesSince = new Date(since);
+        if (isNaN(changesSince.getTime())) {
+            this.logger.error('Invalid date format');
+            throw new Error('Invalid time value');
+        }
+        
         try {
-            const changesSince = new Date(since);
             this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
 
             const changes = await this.changeProcessorService.getServerChanges(changesSince);

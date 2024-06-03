@@ -34,7 +34,9 @@
 // }
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { Db, MongoServerError } from 'mongodb';
+import { Db, MongoServerError, ObjectId } from 'mongodb';
+
+import { ReceiveClientChangesReq } from '../models'
 
 @Injectable()
 export class ChangeProcessorService {
@@ -42,7 +44,7 @@ export class ChangeProcessorService {
 
     constructor(private readonly databaseService: DatabaseService) { }
 
-    async processClientChanges(changes: any[]): Promise<void> {
+    async processClientChanges(changes: ReceiveClientChangesReq): Promise<void> {
         this.logger.log('Processing client changes');
         this.logger.debug(`Changes data: ${JSON.stringify(changes)}`);
 
@@ -50,7 +52,7 @@ export class ChangeProcessorService {
             const db: Db = await this.databaseService.getDb();
             const collection = db.collection('client-changes');
 
-            for (const change of changes) {
+            for (const change of changes.changes) {
                 try {
                     switch (change.type) {
                         case 'create':

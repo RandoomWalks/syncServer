@@ -1,0 +1,19 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm-up"
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool-down"
+scenarios:
+  - flow:
+      - post:
+          url: "/sync/process"
+          json:
+            data: ["test1", "test2", "test3"]
+  

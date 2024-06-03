@@ -1,0 +1,42 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm-up"
+    - duration: 300
+      arrivalRate: 50
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool-down"
+scenarios:
+  - flow:
+      - function: "generateData"
+      - post:
+          url: "/sync/process"
+          json:
+            data: "{{ data }}"
+  - flow:
+      - function: "generateLargeData"
+      - post:
+          url: "/sync/process"
+          json:
+            data: "{{ data }}"
+  - flow:
+      - function: "generateSmallData"
+      - post:
+          url: "/sync/process"
+          json:
+            data: "{{ data }}"
+  
+functions:
+  generateData:
+    - function: "randomInt"
+      args: [5, 10]
+    - script: "vars.data = Array.from({ length: $0 }, (_, i) => `test_${i}`);"
+  generateLargeData:
+    - script: "vars.data = Array.from({ length: 100 }, (_, i) => `test_large_${i}`);"
+  generateSmallData:
+    - script: "vars.data = Array.from({ length: 3 }, (_, i) => `test_small_${i}`);"
+

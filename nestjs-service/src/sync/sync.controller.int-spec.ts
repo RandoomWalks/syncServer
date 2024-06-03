@@ -97,4 +97,14 @@ describe('SyncController (e2e)', () => {
       .send({ data: ['test'] })
       .expect(404);
   });
+
+
+  
+  it('should process data via Go service', async () => {
+    await request(app.getHttpServer())
+      .post('/sync/unknown')
+      .send({ data: ['test'] })
+      .expect(404);
+  });
+  
 });

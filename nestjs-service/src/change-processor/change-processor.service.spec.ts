@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChangeProcessorService } from './change-processor.service';
 import { DatabaseService } from '../database/database.service';
-import { Db } from 'mongodb';
+import { ObjectId,Db } from 'mongodb';
+import { ReceiveClientChangesReq } from '../models'
 
 describe('ChangeProcessorService', () => {
     let service: ChangeProcessorService;
@@ -40,11 +41,11 @@ describe('ChangeProcessorService', () => {
     });
 
     it('should process client changes', async () => {
-        const changes = [
-            { type: 'create', data: { _id: 1, name: 'test' } },
-            { type: 'update', data: { _id: 1, name: 'updated' } },
-            { type: 'delete', data: { _id: 1 } },
-        ];
+        const changes: ReceiveClientChangesReq = {changes:[
+            { type: 'create', data: { _id: new ObjectId(1), name: 'test' } },
+            { type: 'update', data: { _id: new ObjectId(1), name: 'updated' } },
+            { type: 'delete', data: { _id: new ObjectId(1) } },
+        ]}
 
         await service.processClientChanges(changes);
 

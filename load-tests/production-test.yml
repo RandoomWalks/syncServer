@@ -1,16 +1,42 @@
 
+# config:
+#   target: 'http://localhost:3000'
+#   phases:
+#     - duration: 120
+#       arrivalRate: 50
+#       name: "Ramp-up"
+#     # - duration: 600
+#     #   arrivalRate: 200
+#     #   name: "Sustained load"
+#     # - duration: 120
+#     #   arrivalRate: 50
+#     #   name: "Ramp-down"
+#   defaults:
+#     headers:
+#       Content-Type: "application/json"
+# scenarios:
+#   - flow:
+#       - post:
+#           url: "/sync/client-changes"
+#           json:
+#             changes: [
+#               { type: 'create', data: { _id: 1, name: 'test1' } },
+#               { type: 'update', data: { _id: 1, name: 'test1_updated' } },
+#               { type: 'delete', data: { _id: 1 } }
+#             ]
+#       - get:
+#           url: "/sync/server-changes"
+#           qs: 
+#             since: "{{ now }}"
+
+
+
 config:
   target: 'http://localhost:3000'
   phases:
     - duration: 120
       arrivalRate: 50
       name: "Ramp-up"
-    - duration: 600
-      arrivalRate: 200
-      name: "Sustained load"
-    - duration: 120
-      arrivalRate: 50
-      name: "Ramp-down"
   defaults:
     headers:
       Content-Type: "application/json"
@@ -27,7 +53,7 @@ scenarios:
       - get:
           url: "/sync/server-changes"
           qs: 
-            since: "{{ now }}"
+            since: "2024-05-30T12:00:00Z" 
 
 
 

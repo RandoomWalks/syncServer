@@ -27,6 +27,10 @@ import { ChangeProcessorService } from '../change-processor/change-processor.ser
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
 import { GoClientService } from './go-client.service';
 
+import { Db, MongoServerError, ObjectId } from 'mongodb';
+import { ReceiveClientChangesReq } from '../models'
+
+
 @Controller('sync')
 export class SyncController {
     private readonly logger = new Logger(SyncController.name);
@@ -39,7 +43,7 @@ export class SyncController {
 
 
     @Post('client-changes')
-    async receiveClientChanges(@Body() changes: any[]): Promise<any> {
+    async receiveClientChanges(@Body() changes: ReceiveClientChangesReq): Promise<any> {
         this.logger.log('Received client changes');
         this.logger.debug(`Client changes data: ${JSON.stringify(changes)}`);
 

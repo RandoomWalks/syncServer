@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SyncController } from './sync.controller';
 import { ChangeProcessorService } from '../change-processor/change-processor.service';
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
+import { ObjectId } from 'mongodb';
+import { ReceiveClientChangesReq } from '../models'
 
 describe('SyncController', () => {
     let controller: SyncController;
@@ -32,7 +34,7 @@ describe('SyncController', () => {
         controller = module.get<SyncController>(SyncController);
 
         changeProcessorService = module.get<ChangeProcessorService>(ChangeProcessorService);
-        
+
         serverChangeTrackerService = module.get<ServerChangeTrackerService>(ServerChangeTrackerService);
     });
 
@@ -41,8 +43,8 @@ describe('SyncController', () => {
     });
 
     it('should process client changes', async () => {
-        const changes = [{ type: 'create', data: { _id: 1, name: 'test' } }];
-        await controller.receiveClientChanges(changes);
+        const changes = { changes: [{ type: 'create', data: { _id: new ObjectId(1), name: 'test' } }] };
+        await controller.receiveClientChanges(changes as ReceiveClientChangesReq);
 
         expect(changeProcessorService.processClientChanges).toHaveBeenCalledWith(changes);
     });

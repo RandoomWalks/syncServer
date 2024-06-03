@@ -26,6 +26,7 @@ import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
 import { ChangeProcessorService } from '../change-processor/change-processor.service';
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
 import { GoClientService } from './go-client.service';
+import { ChangeDto } from '../models/external/change.dto';
 
 import { Db, MongoServerError, ObjectId } from 'mongodb';
 import { ReceiveClientChangesReq } from '../models'
@@ -43,7 +44,8 @@ export class SyncController {
 
 
     @Post('client-changes')
-    async receiveClientChanges(@Body() changes: ReceiveClientChangesReq): Promise<any> {
+        async receiveClientChanges(@Body() changes: ChangeDto[]): Promise<any> {
+
         this.logger.log('Received client changes');
         this.logger.debug(`Client changes data: ${JSON.stringify(changes)}`);
 
@@ -58,7 +60,8 @@ export class SyncController {
     }
 
     @Get('server-changes')
-    async sendServerChanges(@Query('since') since: string): Promise<any[]> {
+    async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
+
         this.logger.log('Received request for server changes');
         this.logger.debug(`Query parameter 'since': ${since}`);
 
@@ -77,7 +80,7 @@ export class SyncController {
 
 
     @Post('process')
-    async processData(@Body() body: { data: string[] }) {
+    async processData(@Body() body: { data: ChangeDto[] }) {
         return this.goClientService.syncData(body.data);
     }
 }

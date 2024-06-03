@@ -10,15 +10,20 @@
 //   }
 // }
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { ChangeDto } from '../models/external/change.dto';
 
 @Injectable()
 export class GoClientService {
-  constructor(private readonly httpService: HttpService) {}
+  private readonly logger = new Logger(GoClientService.name);
 
-  async syncData(data: string[]): Promise<any> {
+  constructor(private readonly httpService: HttpService) { }
+
+  async syncData(data: ChangeDto[]): Promise<any> {
+    this.logger.log('Sending data to Go service');
     const response = await this.httpService.post('http://go-service:8080/sync', { data }).toPromise();
+    this.logger.log('Received response from Go service');
     return response.data;
   }
 }

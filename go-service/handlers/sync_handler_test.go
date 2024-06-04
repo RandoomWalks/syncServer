@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
 	"go-service/models"
+
 )
 
 func TestSyncHandler(t *testing.T) {

@@ -1,11 +1,15 @@
-// models/internal/change.model.ts
 import { ObjectId } from 'mongodb';
+import { OTDocument, Operation,VectorClock } from '../../crdt/ot-document.model';
 
-export class Change {
+
+// Define the type of document stored in MongoDB
+export interface ChangeDocument {
     _id: ObjectId;
-    type: 'create' | 'update' | 'delete';
-    data: any;
+    type: "insert" | "delete";
+    position: number;
+    vectorClock: VectorClock;
+    clientId: string;
+    text?: string;
+    length?: number;
     updatedAt: Date;
   }
-
-  // data: {_id: new ObjectId(),  }

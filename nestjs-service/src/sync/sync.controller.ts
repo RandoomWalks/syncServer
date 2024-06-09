@@ -1,36 +1,78 @@
-// import { Controller, Post, Body, Get, Query } from '@nestjs/common';
+// import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
 // import { ChangeProcessorService } from '../change-processor/change-processor.service';
 // import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
+// import { GoClientService } from './go-client.service';
+// import { ChangeDto } from '../models/external/change.dto';
+
+// import { Db, MongoServerError, ObjectId } from 'mongodb';
+// import { ReceiveClientChangesReq } from '../models'
+
 
 // @Controller('sync')
 // export class SyncController {
+//     private readonly logger = new Logger(SyncController.name);
+
 //     constructor(
 //         private readonly changeProcessorService: ChangeProcessorService,
 //         private readonly serverChangeTrackerService: ServerChangeTrackerService,
+//         private readonly goClientService: GoClientService,
 //     ) { }
 
+
 //     @Post('client-changes')
-//     async receiveClientChanges(@Body() changes: any[]): Promise<any> {
-//         await this.changeProcessorService.processClientChanges(changes);
-//         return { message: 'Client changes processed successfully' };
+//         async receiveClientChanges(@Body() changes: ChangeDto[]): Promise<any> {
+
+//         this.logger.log('Received client changes');
+//         this.logger.debug(`Client changes data: ${JSON.stringify(changes)}`);
+
+//         try {
+//             await this.changeProcessorService.processClientChanges(changes);
+//             this.logger.log('Client changes processed successfully');
+//             return { message: 'Client changes processed successfully' };
+//         } catch (error) {
+//             this.logger.error('Error processing client changes', error.stack);
+//             throw error;
+//         }
 //     }
 
 //     @Get('server-changes')
-//     async sendServerChanges(@Query('since') since: string): Promise<any[]> {
+//     async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
+//         // parameter extracted from URL: ie https://example.com/api/items?since=2023-01-01T00:00:00Z
+
+//         this.logger.log('Received request for server changes');
+//         this.logger.debug(`Query parameter 'since': ${since}`);
+
 //         const changesSince = new Date(since);
-//         return await this.changeProcessorService.getServerChanges(changesSince);
+//         if (isNaN(changesSince.getTime())) {
+//             this.logger.error('Invalid date format');
+//             throw new Error('Invalid time value');
+//         }
+        
+//         try {
+//             this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
+
+//             const changes = await this.changeProcessorService.getServerChanges(changesSince);
+//             this.logger.log('Server changes retrieved successfully');
+//             return changes;
+//         } catch (error) {
+//             this.logger.error('Error retrieving server changes', error.stack);
+//             throw error;
+//         }
+//     }
+
+
+//     @Post('process')
+//     async processData(@Body() body: { data: ChangeDto[] }) {
+//         return this.goClientService.syncData(body.data);
 //     }
 // }
+
 
 import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
 import { ChangeProcessorService } from '../change-processor/change-processor.service';
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
 import { GoClientService } from './go-client.service';
 import { ChangeDto } from '../models/external/change.dto';
-
-import { Db, MongoServerError, ObjectId } from 'mongodb';
-import { ReceiveClientChangesReq } from '../models'
-
 
 @Controller('sync')
 export class SyncController {
@@ -40,15 +82,12 @@ export class SyncController {
         private readonly changeProcessorService: ChangeProcessorService,
         private readonly serverChangeTrackerService: ServerChangeTrackerService,
         private readonly goClientService: GoClientService,
-    ) { }
-
+    ) {}
 
     @Post('client-changes')
-        async receiveClientChanges(@Body() changes: ChangeDto[]): Promise<any> {
-
+    async receiveClientChanges(@Body() changes: ChangeDto[]): Promise<any> {
         this.logger.log('Received client changes');
         this.logger.debug(`Client changes data: ${JSON.stringify(changes)}`);
-
         try {
             await this.changeProcessorService.processClientChanges(changes);
             this.logger.log('Client changes processed successfully');
@@ -61,20 +100,15 @@ export class SyncController {
 
     @Get('server-changes')
     async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
-        // parameter extracted from URL: ie https://example.com/api/items?since=2023-01-01T00:00:00Z
-
         this.logger.log('Received request for server changes');
         this.logger.debug(`Query parameter 'since': ${since}`);
-
         const changesSince = new Date(since);
         if (isNaN(changesSince.getTime())) {
             this.logger.error('Invalid date format');
             throw new Error('Invalid time value');
         }
-        
         try {
             this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
-
             const changes = await this.changeProcessorService.getServerChanges(changesSince);
             this.logger.log('Server changes retrieved successfully');
             return changes;
@@ -83,7 +117,6 @@ export class SyncController {
             throw error;
         }
     }
-
 
     @Post('process')
     async processData(@Body() body: { data: ChangeDto[] }) {

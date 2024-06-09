@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { Change } from '../models/internal/change.model';
+import { ChangeDocument } from '../models/internal/change.model';
 import { ChangeDto } from '../models/external/change.dto';
 import { ChangeConverter } from '../converters/change.converter';
+
+import { ObjectId } from 'mongodb';
+
 
 @Injectable()
 export class ServerChangeTrackerService {
@@ -12,7 +15,11 @@ export class ServerChangeTrackerService {
 
     async trackChange(changeDto: ChangeDto): Promise<void> {
         this.logger.log('Tracking change');
-        const change: Change = ChangeConverter.toInternal(changeDto);
+        const change: ChangeDocument = {
+            ...ChangeConverter.toInternal(changeDto),
+            _id:new ObjectId(), 
+            updatedAt:new Date(),
+        }
 
         try {
             const db = await this.databaseService.getDb();
@@ -29,19 +36,13 @@ export class ServerChangeTrackerService {
         this.logger.log('Retrieving changes since timestamp');
         try {
             const db = await this.databaseService.getDb();
-            const collection = db.collection('change-tracker');
-            const changes = await collection.find({ timestamp: { $gt: timestamp } }).toArray();
+            const collection = db.collection<ChangeDocument>('change-tracker');
+            const changes:ChangeDocument[] = await collection.find({ timestamp: { $gt: timestamp } }).toArray();
             if (!changes) {
                 throw new Error('Failed to retrieve changes from the database');
             }
             return changes.map((doc) => {
-                const change: Change = {
-                    _id: doc._id,
-                    type: doc.type,
-                    data: doc.data,
-                    updatedAt: doc.updatedAt,
-                };
-                return ChangeConverter.toExternal(change);
+                return ChangeConverter.toExternal(doc);
             });
         } catch (error) {
             this.logger.error('Error retrieving changes', error.stack);

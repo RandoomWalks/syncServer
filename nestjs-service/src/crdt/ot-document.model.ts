@@ -93,35 +93,65 @@ export class OTDocument {
         return transformedOp;
     }
 
-    private transformAgainst(op: Operation, againstOp: Operation): Operation {
-        if (op.type === 'insert' && againstOp.type === 'insert') {
-            if (op.position > againstOp.position || (op.position === againstOp.position && op.clientId > againstOp.clientId)) {
-                return { ...op, position: op.position + (againstOp.text?.length || 0) };
-            }
-        } else if (op.type === 'delete' && againstOp.type === 'delete') {
-            // if (op.position >= againstOp.position && op.position < againstOp.position + (againstOp.length || 0)) {
-            //     return { ...op, position: againstOp.position, length: 0 };
-            // } else if (op.position > againstOp.position + (againstOp.length || 0)) {
-            //     return { ...op, position: op.position - (againstOp.length || 0) };
-            // }
-            if (op.position >= againstOp.position && op.position < againstOp.position + (againstOp.length || 0)) {
-                const overlap = (againstOp.length || 0) - (op.position - againstOp.position);
-                return { ...op, position: againstOp.position, length: (op.length || 0) - overlap };
-            } else if (op.position > againstOp.position + (againstOp.length || 0)) {
-                return { ...op, position: op.position - (againstOp.length || 0) };
-            }
+    // private transformAgainst(op: Operation, againstOp: Operation): Operation {
+    //     if (op.type === 'insert' && againstOp.type === 'insert') {
+    //         if (op.position > againstOp.position || (op.position === againstOp.position && op.clientId > againstOp.clientId)) {
+    //             return { ...op, position: op.position + (againstOp.text?.length || 0) };
+    //         }
+    //     } else if (op.type === 'delete' && againstOp.type === 'delete') {
+    //         // if (op.position >= againstOp.position && op.position < againstOp.position + (againstOp.length || 0)) {
+    //         //     return { ...op, position: againstOp.position, length: 0 };
+    //         // } else if (op.position > againstOp.position + (againstOp.length || 0)) {
+    //         //     return { ...op, position: op.position - (againstOp.length || 0) };
+    //         // }
+    //         if (op.position >= againstOp.position && op.position < againstOp.position + (againstOp.length || 0)) {
+    //             const overlap = (againstOp.length || 0) - (op.position - againstOp.position);
+    //             return { ...op, position: againstOp.position, length: (op.length || 0) - overlap };
+    //         } else if (op.position > againstOp.position + (againstOp.length || 0)) {
+    //             return { ...op, position: op.position - (againstOp.length || 0) };
+    //         }
     
             
-        } else if (op.type === 'insert' && againstOp.type === 'delete') {
-            if (op.position >= againstOp.position + (againstOp.length || 0)) {
-                return { ...op, position: op.position - (againstOp.length || 0) };
-            }
-        } else if (op.type === 'delete' && againstOp.type === 'insert') {
-            if (op.position >= againstOp.position) {
-                return { ...op, position: op.position + (againstOp.text?.length || 0) };
-            }
-        }
+    //     } else if (op.type === 'insert' && againstOp.type === 'delete') {
+    //         if (op.position >= againstOp.position + (againstOp.length || 0)) {
+    //             return { ...op, position: op.position - (againstOp.length || 0) };
+    //         }
+    //     } else if (op.type === 'delete' && againstOp.type === 'insert') {
+    //         if (op.position >= againstOp.position) {
+    //             return { ...op, position: op.position + (againstOp.text?.length || 0) };
+    //         }
+    //     }
 
+    //     return op;
+    // }
+    private transformAgainst(op: Operation, againstOp: Operation): Operation {
+        if (op.type === 'insert' && againstOp.type === 'insert') {
+          if (op.position > againstOp.position || (op.position === againstOp.position && op.clientId > againstOp.clientId)) {
+            return { ...op, position: op.position + (againstOp.text?.length || 0) };
+          }
+        } else if (op.type === 'delete' && againstOp.type === 'delete') {
+          if (op.position >= againstOp.position && op.position < againstOp.position + (againstOp.length || 0)) {
+            const overlap = Math.min(op.length || 0, (againstOp.length || 0) - (op.position - againstOp.position));
+            return { ...op, position: againstOp.position, length: (op.length || 0) - overlap };
+          } else if (op.position >= againstOp.position + (againstOp.length || 0)) {
+            return { ...op, position: op.position - (againstOp.length || 0) };
+          } else if (op.position + (op.length || 0) <= againstOp.position) {
+            // If op ends before againstOp starts, no change needed
+            return op;
+          }
+        } else if (op.type === 'insert' && againstOp.type === 'delete') {
+          if (op.position >= againstOp.position + (againstOp.length || 0)) {
+            return { ...op, position: op.position - (againstOp.length || 0) };
+          } else if (op.position >= againstOp.position && op.position < againstOp.position + (againstOp.length || 0)) {
+            return { ...op, position: againstOp.position };
+          }
+        } else if (op.type === 'delete' && againstOp.type === 'insert') {
+          if (op.position >= againstOp.position) {
+            return { ...op, position: op.position + (againstOp.text?.length || 0) };
+          }
+        }
         return op;
-    }
+      }
+      
+      
 }

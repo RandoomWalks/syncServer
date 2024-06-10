@@ -1,0 +1,261 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 60
+      arrivalRate: 50
+    - duration: 30
+      arrivalRate: 100
+    - duration: 60
+      arrivalRate: 200
+  processor: "./artillery-processor.js"
+scenarios:
+  - name: Reset Document
+    flow:
+      - post:
+          url: '/reset-document'
+          json:
+            initialDocument: 'Hello'
+      - log: "Document reset to: Hello"
+  - name: Basic Insert and Delete Operations
+    flow:
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 5
+              text: ' World'
+              vectorClock:
+                client1: 1
+              clientId: 'client1'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 0
+              length: 5
+              vectorClock:
+                client2: 1
+              clientId: 'client2'
+      - get:
+          url: '/document'
+          capture:
+            - json: '$.document'
+              as: 'document'
+      - log: 'Document after basic operations: {{ document }}'
+      - set: 
+          expected: " World"
+      - call: "assertDocument"
+  - name: Complex Operation Sequence
+    flow:
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 5
+              text: ' World'
+              vectorClock:
+                client1: 1
+              clientId: 'client1'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 0
+              length: 5
+              vectorClock:
+                client2: 1
+              clientId: 'client2'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 0
+              text: 'Hey'
+              vectorClock:
+                client3: 1
+              clientId: 'client3'
+      - get:
+          url: '/document'
+          capture:
+            - json: '$.document'
+              as: 'document'
+      - log: 'Document after complex operations: {{ document }}'
+      - set: 
+          expected: "Hey World"
+      - call: "assertDocument"
+  - name: Large Document Operations
+    flow:
+      - post:
+          url: '/reset-document'
+          json:
+            initialDocument: "{{ repeat('A', 10000) }}"
+      - loop:
+          - count: 100
+            flow:
+              - post:
+                  url: '/apply-operation'
+                  json:
+                    operation:
+                      type: "{{ randomInt(0, 1) === 0 ? 'insert' : 'delete' }}"
+                      position: "{{ randomInt(0, 10000) }}"
+                      text: "{{ repeat('X', randomInt(1, 10)) }}"
+                      length: "{{ randomInt(1, 10) }}"
+                      vectorClock:
+                        client1: "{{ randomInt(1, 10) }}"
+                      clientId: "client{{ randomInt(1, 10) }}"
+              - get:
+                  url: '/document'
+                  capture:
+                    - json: '$.document'
+                      as: 'document'
+              - log: 'Document after large operation: {{ document.length }} characters'
+  - name: Concurrent Overlapping Operations
+    flow:
+      - post:
+          url: '/reset-document'
+          json:
+            initialDocument: 'Hello'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 2
+              length: 4
+              vectorClock:
+                client1: 1
+              clientId: 'client1'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 3
+              length: 2
+              vectorClock:
+                client2: 1
+              clientId: 'client2'
+      - get:
+          url: '/document'
+          capture:
+            - json: '$.document'
+              as: 'document'
+      - log: 'Document after concurrent overlapping deletes: {{ document }}'
+      - set: 
+          expected: "He"
+      - call: "assertDocument"
+  - name: Interleaved Insert and Delete Operations
+    flow:
+      - post:
+          url: '/reset-document'
+          json:
+            initialDocument: 'Hello'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 1
+              text: 'A'
+              vectorClock:
+                client1: 1
+              clientId: 'client1'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 2
+              length: 1
+              vectorClock:
+                client1: 2
+              clientId: 'client1'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 3
+              text: 'B'
+              vectorClock:
+                client1: 3
+              clientId: 'client1'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 4
+              length: 1
+              vectorClock:
+                client1: 4
+              clientId: 'client1'
+      - get:
+          url: '/document'
+          capture:
+            - json: '$.document'
+              as: 'document'
+      - log: 'Document after interleaved operations: {{ document }}'
+      - set: 
+          expected: "HAeBl"
+      - call: "assertDocument"
+  - name: Bulk Operations
+    flow:
+      - post:
+          url: '/reset-document'
+          json:
+            initialDocument: 'Hello'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 0
+              text: 'Start '
+              vectorClock:
+                client1: 1
+              clientId: 'client1'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 6
+              text: 'Middle '
+              vectorClock:
+                client2: 1
+              clientId: 'client2'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 12
+              length: 5
+              vectorClock:
+                client3: 1
+              clientId: 'client3'
+      - post:
+          url: '/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 16
+              text: ' End'
+              vectorClock:
+                client4: 1
+              clientId: 'client4'
+      - get:
+          url: '/document'
+          capture:
+            - json: '$.document'
+              as: 'document'
+      - log: 'Document after bulk operations: {{ document }}'
+      - set: 
+          expected: "Start Middle End"
+      - call: "assertDocument"

@@ -133,6 +133,8 @@ services:
   nestjs-service:
     build:
       context: ./nestjs-service
+    volumes:
+      - ./nestjs-service:/usr/src/app      
     ports:
       - "3000:3000"
     depends_on:

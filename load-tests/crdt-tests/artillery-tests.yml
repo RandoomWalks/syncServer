@@ -12,14 +12,16 @@ scenarios:
   - name: Reset Document
     flow:
       - post:
-          url: '/reset-document'
+          url: '/sync/reset-document'
           json:
             initialDocument: 'Hello'
       - log: "Document reset to: Hello"
+  
   - name: Basic Insert and Delete Operations
     flow:
+      # Insert " World" at position 5
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -27,9 +29,10 @@ scenarios:
               text: ' World'
               vectorClock:
                 client1: 1
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
+      # Delete 5 characters from the start
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'delete'
@@ -37,20 +40,28 @@ scenarios:
               length: 5
               vectorClock:
                 client2: 1
-              clientId: 'client2'
+              clientId: '60d5f9f8f8a6f12a9c3e3a12'  # Valid ObjectId
+      # Get the current document state
       - get:
-          url: '/document'
+          url: '/sync/document'
           capture:
             - json: '$.document'
               as: 'document'
       - log: 'Document after basic operations: {{ document }}'
-      - set: 
+      - set:
           expected: " World"
       - call: "assertDocument"
+  
   - name: Complex Operation Sequence
     flow:
+      # Reset the document to "Hello"
       - post:
-          url: '/apply-operation'
+          url: '/sync/reset-document'
+          json:
+            initialDocument: 'Hello'
+      # Insert " World" at position 5
+      - post:
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -58,9 +69,10 @@ scenarios:
               text: ' World'
               vectorClock:
                 client1: 1
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
+      # Delete 5 characters from the start
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'delete'
@@ -68,9 +80,10 @@ scenarios:
               length: 5
               vectorClock:
                 client2: 1
-              clientId: 'client2'
+              clientId: '60d5f9f8f8a6f12a9c3e3a12'  # Valid ObjectId
+      # Insert "Hey" at the start
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -78,50 +91,59 @@ scenarios:
               text: 'Hey'
               vectorClock:
                 client3: 1
-              clientId: 'client3'
+              clientId: '60d5f9f8f8a6f12a9c3e3a13'  # Valid ObjectId
+      # Get the current document state
       - get:
-          url: '/document'
+          url: '/sync/document'
           capture:
             - json: '$.document'
               as: 'document'
       - log: 'Document after complex operations: {{ document }}'
-      - set: 
+      - set:
           expected: "Hey World"
       - call: "assertDocument"
+  
   - name: Large Document Operations
     flow:
+      # Reset the document to a large initial state
       - post:
-          url: '/reset-document'
+          url: '/sync/reset-document'
           json:
             initialDocument: "{{ repeat('A', 10000) }}"
+      # Apply multiple operations on the large document
       - loop:
-          - count: 100
-            flow:
-              - post:
-                  url: '/apply-operation'
-                  json:
-                    operation:
-                      type: "{{ randomInt(0, 1) === 0 ? 'insert' : 'delete' }}"
-                      position: "{{ randomInt(0, 10000) }}"
-                      text: "{{ repeat('X', randomInt(1, 10)) }}"
-                      length: "{{ randomInt(1, 10) }}"
-                      vectorClock:
-                        client1: "{{ randomInt(1, 10) }}"
-                      clientId: "client{{ randomInt(1, 10) }}"
-              - get:
-                  url: '/document'
-                  capture:
-                    - json: '$.document'
-                      as: 'document'
-              - log: 'Document after large operation: {{ document.length }} characters'
+          count: 100
+          flow:
+            # Randomly insert or delete text in the large document
+            - post:
+                url: '/sync/apply-operation'
+                json:
+                  operation:
+                    type: "{{ randomInt(0, 1) === 0 ? 'insert' : 'delete' }}"
+                    position: "{{ randomInt(0, 10000) }}"
+                    text: "{{ repeat('X', randomInt(1, 10)) }}"
+                    length: "{{ randomInt(1, 10) }}"
+                    vectorClock:
+                      client1: "{{ randomInt(1, 10) }}"
+                    clientId: "60d5f9f8f8a6f12a9c3e3a1{{ randomInt(0, 9) }}"  # Valid ObjectId
+            # Get the current document state
+            - get:
+                url: '/sync/document'
+                capture:
+                  - json: '$.document'
+                    as: 'document'
+            - log: 'Document after large operation: {{ document.length }} characters'
+  
   - name: Concurrent Overlapping Operations
     flow:
+      # Reset the document to "Hello"
       - post:
-          url: '/reset-document'
+          url: '/sync/reset-document'
           json:
             initialDocument: 'Hello'
+      # Apply overlapping delete operations concurrently
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'delete'
@@ -129,9 +151,9 @@ scenarios:
               length: 4
               vectorClock:
                 client1: 1
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'delete'
@@ -139,24 +161,28 @@ scenarios:
               length: 2
               vectorClock:
                 client2: 1
-              clientId: 'client2'
+              clientId: '60d5f9f8f8a6f12a9c3e3a12'  # Valid ObjectId
+      # Get the current document state
       - get:
-          url: '/document'
+          url: '/sync/document'
           capture:
             - json: '$.document'
               as: 'document'
       - log: 'Document after concurrent overlapping deletes: {{ document }}'
-      - set: 
+      - set:
           expected: "He"
       - call: "assertDocument"
+  
   - name: Interleaved Insert and Delete Operations
     flow:
+      # Reset the document to "Hello"
       - post:
-          url: '/reset-document'
+          url: '/sync/reset-document'
           json:
             initialDocument: 'Hello'
+      # Interleave insert and delete operations
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -164,9 +190,9 @@ scenarios:
               text: 'A'
               vectorClock:
                 client1: 1
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'delete'
@@ -174,9 +200,9 @@ scenarios:
               length: 1
               vectorClock:
                 client1: 2
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -184,9 +210,9 @@ scenarios:
               text: 'B'
               vectorClock:
                 client1: 3
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'delete'
@@ -194,24 +220,28 @@ scenarios:
               length: 1
               vectorClock:
                 client1: 4
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
+      # Get the current document state
       - get:
-          url: '/document'
+          url: '/sync/document'
           capture:
             - json: '$.document'
               as: 'document'
       - log: 'Document after interleaved operations: {{ document }}'
-      - set: 
+      - set:
           expected: "HAeBl"
       - call: "assertDocument"
+  
   - name: Bulk Operations
     flow:
+      # Reset the document to "Hello"
       - post:
-          url: '/reset-document'
+          url: '/sync/reset-document'
           json:
             initialDocument: 'Hello'
+      # Apply multiple operations in bulk
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -219,9 +249,9 @@ scenarios:
               text: 'Start '
               vectorClock:
                 client1: 1
-              clientId: 'client1'
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -229,9 +259,9 @@ scenarios:
               text: 'Middle '
               vectorClock:
                 client2: 1
-              clientId: 'client2'
+              clientId: '60d5f9f8f8a6f12a9c3e3a12'  # Valid ObjectId
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'delete'
@@ -239,9 +269,9 @@ scenarios:
               length: 5
               vectorClock:
                 client3: 1
-              clientId: 'client3'
+              clientId: '60d5f9f8f8a6f12a9c3e3a13'  # Valid ObjectId
       - post:
-          url: '/apply-operation'
+          url: '/sync/apply-operation'
           json:
             operation:
               type: 'insert'
@@ -249,13 +279,201 @@ scenarios:
               text: ' End'
               vectorClock:
                 client4: 1
-              clientId: 'client4'
+              clientId: '60d5f9f8f8a6f12a9c3e3a14'  # Valid ObjectId
+      # Get the current document state
       - get:
-          url: '/document'
+          url: '/sync/document'
           capture:
             - json: '$.document'
               as: 'document'
       - log: 'Document after bulk operations: {{ document }}'
-      - set: 
+      - set:
           expected: "Start Middle End"
       - call: "assertDocument"
+  
+  - name: Receive Client Changes
+    flow:
+      # Send multiple client changes at once
+      - post:
+          url: '/sync/client-changes'
+          json:
+            [
+              {
+                type: 'insert',
+                position: 5,
+                text: ' World',
+                vectorClock: { client1: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
+              },
+              {
+                type: 'delete',
+                position: 0,
+                length: 5,
+                vectorClock: { client2: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a12'  # Valid ObjectId
+              }
+            ]
+      - log: "Client changes received and processed"
+  
+  - name: Retrieve Server Changes
+    flow:
+      # Retrieve server changes since a specific date
+      - get:
+          url: '/sync/server-changes'
+          qs:
+            since: "2023-01-01T00:00:00Z"
+          capture:
+            - json: '$'
+              as: 'serverChanges'
+      - log: 'Server changes retrieved: {{ serverChanges }}'
+
+  - name: Large Client Changes
+    flow:
+      - post:
+          url: '/sync/client-changes'
+          json:
+            [
+              {
+                type: 'insert',
+                position: 0,
+                text: "{{ repeat('A', 10000) }}",
+                vectorClock: { client1: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a11'
+              },
+              {
+                type: 'insert',
+                position: 10000,
+                text: "{{ repeat('B', 10000) }}",
+                vectorClock: { client1: 2 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a11'
+              }
+            ]
+      - log: "Large client changes received and processed"
+
+  - name: Concurrent Client Changes
+    flow:
+      - post:
+          url: '/sync/client-changes'
+          json:
+            [
+              {
+                type: 'insert',
+                position: 0,
+                text: 'Start',
+                vectorClock: { client1: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a11'
+              },
+              {
+                type: 'insert',
+                position: 5,
+                text: ' Middle',
+                vectorClock: { client2: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a12'
+              },
+              {
+                type: 'insert',
+                position: 12,
+                text: ' End',
+                vectorClock: { client3: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a13'
+              }
+            ]
+      - log: "Concurrent client changes received and processed"
+
+  - name: Edge Case Client Changes
+    flow:
+      - post:
+          url: '/sync/client-changes'
+          json:
+            [
+              {
+                type: 'delete',
+                position: 0,
+                length: 5,
+                vectorClock: { client1: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a11'
+              },
+              {
+                type: 'insert',
+                position: 0,
+                text: 'EdgeCase',
+                vectorClock: { client1: 2 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a11'
+              }
+            ]
+      - log: "Edge case client changes received and processed"
+
+  - name: High Frequency Server Changes
+    flow:
+      - loop:
+          count: 50
+          flow:
+            - get:
+                url: '/sync/server-changes'
+                qs:
+                  since: "{{ moment().subtract(1, 'hours').toISOString() }}"
+                capture:
+                  - json: '$'
+                    as: 'serverChanges'
+            - log: 'Server changes retrieved: {{ serverChanges.length }} changes'
+
+  - name: Large Dataset Server Changes
+    flow:
+      - get:
+          url: '/sync/server-changes'
+          qs:
+            since: "2022-01-01T00:00:00Z"
+          capture:
+            - json: '$'
+              as: 'serverChanges'
+      - log: 'Server changes retrieved: {{ serverChanges.length }} changes'
+
+  - name: Edge Case Server Changes
+    flow:
+      - get:
+          url: '/sync/server-changes'
+          qs:
+            since: "invalid-date-format"
+          capture:
+            - json: '$'
+              as: 'serverChanges'
+      - log: 'Edge case server changes retrieved: {{ serverChanges }}'
+
+  - name: Mixed Valid and Invalid Client Changes
+    flow:
+      - post:
+          url: '/sync/client-changes'
+          json:
+            [
+              {
+                type: 'insert',
+                position: 0,
+                text: 'ValidChange',
+                vectorClock: { client1: 1 },
+                clientId: '60d5f9f8f8a6f12a9c3e3a11'
+              },
+              {
+                type: 'insert',
+                position: 5,
+                text: 'InvalidChange',
+                vectorClock: { client1: 2 },
+                clientId: 'invalidObjectId'  # Invalid ObjectId
+              }
+            ]
+      - log: "Mixed valid and invalid client changes received and processed"
+
+  - name: Client Changes with Generated ObjectId
+    flow:
+      - post:
+          url: '/sync/client-changes'
+          json:
+            [
+              {
+                type: 'insert',
+                position: 0,
+                text: 'GeneratedIdChange',
+                vectorClock: { client1: 1 },
+                clientId: 'invalidObjectId'  # Invalid ObjectId
+              }
+            ]
+      - log: "Client changes with generated ObjectId received and processed"

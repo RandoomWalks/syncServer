@@ -4,117 +4,124 @@
 
 **Project Name**: Microservices Architecture with NestJS and Go
 
-**Project Description**: This project implements a microservices architecture to handle performance-critical tasks efficiently. The NestJS service serves as the main backend, orchestrating various modules and communicating with the Go service, which is designed to handle data processing tasks that require high concurrency and performance.
+**Project Description**: This project implements a microservices architecture to handle performance-critical tasks efficiently. 
+The NestJS service serves as the main backend, orchestrating various modules and communicating with the Go service, which is designed to handle data processing tasks that require high concurrency and performance.
 
-#### Service Responsibilities
+### Key Components
 
-**NestJS Service**:
-- **App Controller**: Handles incoming HTTP requests.
-- **Change Processor Service**: Processes client changes and interacts with the database.
-- **Database Service**: Manages MongoDB connections and database operations.
-- **Server Change Tracker Service**: Tracks and retrieves changes for synchronization.
-- **Sync Controller**: Manages synchronization endpoints.
-- **Go Client Service**: Communicates with the Go service for performance-critical tasks.
+1. **OTDocument Class**:
+   - **Purpose**: Manages the document state and applies operations using OT and vector clocks.
+   - **Implementation**: Contains methods for applying, transforming, and managing operations.
 
-**Go Service**:
-- **HTTP/GRPC Server**: Receives requests from the NestJS service.
-- **Data Processing Logic**: Processes data using Go's concurrency features.
-- **Concurrency Handling**: Utilizes goroutines and channels for parallel processing.
+2. **ChangeProcessorService**:
+   - **Purpose**: Processes client changes, applies them to the OTDocument, and updates the database.
+   - **Implementation**: Converts change DTOs to internal operations, applies them, and uses bulk operations for database updates.
 
-```yaml
-+---------------------------------------------------+
-|                 Client Application                |
-|                                                   |
-|    +-----------------------------------------+    |
-|    |          Web/Mobile Frontend            |    |
-|    +-----------------------------------------+    |
-|                                                   |
-+---------------------------------------------------+
+3. **DatabaseService**:
+   - **Purpose**: Manages database connections and operations.
+   - **Implementation**: Provides methods for getting database instances and performing bulk writes.
 
-                          |
-                          | HTTP Requests
-                          v
+4. **SyncController**:
+   - **Purpose**: Handles HTTP requests for syncing data between clients and the server.
+   - **Implementation**: Exposes endpoints for receiving client changes and sending server changes, integrating with ChangeProcessorService and GoClientService.
 
-+---------------------------------------------------+
-|                 NestJS Service                    |
-|                                                   |
-|    +-----------------------------------------+    |
-|    |          App Controller                 |    |
-|    +-----------------------------------------+    |
-|           /        |        \                     |
-|    +-------------+ +-------------+ +-------------+|
-|    | Change      | | Database    | | Go Client   ||
-|    | Processor   | | Service     | | Service     ||
-|    | Service     | +-------------+ +-------------+|
-|    +-------------+                         |       |
-|            |                               |       |
-|            v                               |       |
-|    +-----------------+                     |       |
-|    | Process Changes |                     |       |
-|    +-----------------+                     |       |
-|            |                               |       |
-|            v                               v       |
-|    +-----------------------------------------+    |
-|    |          Go Service API                |    |
-|    +-----------------------------------------+    |
-|                                                   |
-+---------------------------------------------------+
+### Algorithms and Data Structures
 
-                          |
-                          | HTTP/GRPC Requests
-                          v
+1. **Operational Transform (OT)**:
+   - **Algorithm**: Ensures that all clients can concurrently edit a document, and all edits are consistently applied in all replicas.
+   - **Data Structure**: Maintains a log of operations and their vector clocks to apply transformations correctly.
 
-+---------------------------------------------------+
-|                    Go Service                     |
-|                                                   |
-|    +-----------------------------------------+    |
-|    |          HTTP/GRPC Server               |    |
-|    +-----------------------------------------+    |
-|    |          Data Processing Logic          |    |
-|    +-----------------------------------------+    |
-|    |          Concurrency Handling           |    |
-|    +-----------------------------------------+    |
-|                                                   |
-+---------------------------------------------------+
+2. **Vector Clocks**:
+   - **Algorithm**: Tracks the version of each client's document state to determine the causality of operations.
+   - **Data Structure**: A map where keys are client IDs and values are timestamps, allowing for comparison and merging of different states.
 
-                          |
-                          | Database Operations
-                          v
+3. **Bulk Database Operations**:
+   - **Algorithm**: Uses bulk write operations to efficiently process multiple database updates in a single transaction.
+   - **Data Structure**: An array of operations that are executed together to minimize database interaction overhead.
 
-+---------------------------------------------------+
-|                      Database                     |
-|  (e.g., MongoDB)                                   |
-|                                                   |
-|    +-----------------------------------------+    |
-|    |          Data Collections               |    |
-|    +-----------------------------------------+    |
-|                                                   |
-+---------------------------------------------------+
+   
+### Sequence Diagram for Client Change Processing
+
+```
+Client                   SyncController               ChangeProcessorService          OTDocument                DatabaseService
+   |                           |                                |                          |                           |
+   |-- sendChanges() ---------->                                |                          |                           |
+   |                           |-- receiveClientChanges() ------>                          |                           |
+   |                           |                                |                          |                           |
+   |                           |                                |-- processClientChanges() -->                          |
+   |                           |                                |                          |                           |
+   |                           |                                |                          |-- applyOperation() ------->
+   |                           |                                |                          |                           |
+   |                           |                                |                          |<-- updateDocument() -------|
+   |                           |                                |                          |                           |
+   |                           |                                |-- bulkWrite() ---------> |                           |
+   |                           |                                |                          |                           |
+   |                           |                                |<-- changesPersisted() ---|                           |
+   |                           |                                |                          |                           |
+   |<-- response --------------|                                |                          |                           |
 ```
 
-#### Module Descriptions
 
-**1. App Module**
-- **Files**: `app.module.ts`, `app.controller.ts`, `app.service.ts`
-- **Description**: The main application module that imports all other modules and sets up the basic infrastructure.
+### Class Diagram for Key Components
 
-**2. Change Processor Module**
-- **Files**: `change-processor.module.ts`, `change-processor.service.ts`, `change-processor.service.spec.ts`
-- **Description**: Handles processing of changes received from the client and manages synchronization logic.
+```
++-----------------------------+
+| OTDocument                  |
+|-----------------------------|
+| - doc: string               |
+| - operations: Operation[]   |
+|-----------------------------|
+| + applyOperation(op: Operation) : void     |
+| + getDocument(): string                    |
+| + transformOperation(op: Operation): Operation |
+| + transformAgainst(op: Operation, againstOp: Operation): Operation |
++-----------------------------+
 
-**3. Database Module**
-- **Files**: `database.module.ts`, `database.service.ts`, `database.service.spec.ts`
-- **Description**: Manages the MongoDB connection and provides methods for database operations.
++-----------------------------+
+| ChangeProcessorService      |
+|-----------------------------|
+| - otDocument: OTDocument    |
+|-----------------------------|
+| + processClientChanges(changes: ChangeDto[]): Promise<void> |
+| + getServerChanges(since: Date): Promise<ChangeDto[]>      |
++-----------------------------+
 
-**4. Server Change Tracker Module**
-- **Files**: `server-change-tracker.module.ts`, `server-change-tracker.service.ts`, `server-change-tracker.service.spec.ts`
-- **Description**: Tracks changes made on the server for synchronization purposes.
++-----------------------------+
+| DatabaseService             |
+|-----------------------------|
+| + getDb(): Promise<Db>      |
+| + bulkWrite(ops: any[]): Promise<void> |
++-----------------------------+
 
-**5. Sync Module**
-- **Files**: `sync.module.ts`, `sync.controller.ts`, `sync.controller.spec.ts`
-- **Description**: Defines the synchronization logic and integrates necessary modules.
++-----------------------------+
+| ChangeConverter             |
+|-----------------------------|
+| + toInternal(dto: ChangeDto): Operation |
+| + toExternal(op: Operation): ChangeDto  |
++-----------------------------+
 
-**6. Go Client Service**
-- **Files**: `go-client.service.ts`
-- **Description**: Responsible for making HTTP/GRPC requests to the Go service for data processing.
++-----------------------------+
+| SyncController              |
+|-----------------------------|
+| + receiveClientChanges(changes: ChangeDto[]): Promise<any> |
+| + sendServerChanges(since: string): Promise<ChangeDto[]>   |
+| + processData(body: { data: ChangeDto[] }): Promise<any>   |
++-----------------------------+
+```
 
+### Database Schema Diagram
+
+```
++---------------------------+
+|       client-changes      |
+|---------------------------|
+| _id: ObjectId             |
+| type: string              |
+| position: number          |
+| text: string              |
+| length: number            |
+| vectorClock: object       |
+| clientId: string          |
+| updatedAt: Date           |
++---------------------------+
+```

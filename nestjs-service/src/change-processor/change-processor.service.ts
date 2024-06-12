@@ -54,7 +54,10 @@ export class ChangeProcessorService {
                 if (ObjectId.isValid(operation.clientId)) {
                     clientId = new ObjectId(operation.clientId);
                 } else {
-                    throw new Error(`Invalid ObjectId format for clientId: ${operation.clientId}`);
+                    this.logger.warn(`Invalid ObjectId format for clientId: ${operation.clientId}, generating a new ObjectId`);
+
+                    clientId = new ObjectId(); // Generate a valid ObjectId if necessary
+                    // throw new Error(`Invalid ObjectId format for clientId: ${operation.clientId}`);
                 }
 
                 this.otDocument.applyOperation(operation);

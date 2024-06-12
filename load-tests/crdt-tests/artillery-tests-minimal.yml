@@ -1,0 +1,108 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 10
+      arrivalRate: 50
+  processor: "./artillery-processor.js"
+scenarios:
+  # - name: Reset Document
+  #   flow:
+  #     - post:
+  #         url: '/sync/reset-document'
+  #         json:
+  #           initialDocument: 'Hello'
+  #     - log: "Document reset to: Hello"
+  - name: Basic Insert and Delete Operations
+    flow:
+      - post:
+          url: '/sync/apply-operation'
+          json:
+            operation:
+              type: 'insert'
+              position: 5
+              text: ' World'
+              vectorClock:
+                client1: 1
+              clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
+      - post:
+          url: '/sync/apply-operation'
+          json:
+            operation:
+              type: 'delete'
+              position: 0
+              length: 5
+              vectorClock:
+                client2: 1
+              clientId: '60d5f9f8f8a6f12a9c3e3a12'  # Valid ObjectId
+      - get:
+          url: '/sync/document'
+          capture:
+            - json: '$.document'
+              as: 'document'
+      - log: 'Document after basic operations: {{ document }}'
+      - set:
+          expected: " World"
+      - call: "assertDocument"
+  # - name: Complex Operation Sequence
+  #   flow:
+  #     - post:
+  #         url: '/sync/apply-operation'
+  #         json:
+  #           operation:
+  #             type: 'insert'
+  #             position: 5
+  #             text: ' World'
+  #             vectorClock:
+  #               client1: 1
+  #             clientId: '60d5f9f8f8a6f12a9c3e3a11'  # Valid ObjectId
+  #     - post:
+  #         url: '/sync/apply-operation'
+  #         json:
+  #           operation:
+  #             type: 'delete'
+  #             position: 0
+  #             length: 5
+  #             vectorClock:
+  #               client2: 1
+  #             clientId: '60d5f9f8f8a6f12a9c3e3a12'  # Valid ObjectId
+  #     - post:
+  #         url: '/sync/apply-operation'
+  #         json:
+  #           operation:
+  #             type: 'insert'
+  #             position: 0
+  #             text: 'Hey'
+  #             vectorClock:
+  #               client3: 1
+  #             clientId: '60d5f9f8f8a6f12a9c3e3a13'  # Valid ObjectId
+  #     - get:
+  #         url: '/sync/document'
+  #         capture:
+  #           - json: '$.document'
+  #             as: 'document'
+  #     - log: 'Document after complex operations: {{ document }}'
+  #     - set:
+  #         expected: "Hey World"
+  #     - call: "assertDocument"
+  # - name: Mixed Valid and Invalid Client Changes
+  #   flow:
+  #     - post:
+  #         url: '/sync/client-changes'
+  #         json:
+  #           [
+  #             {
+  #               type: 'insert',
+  #               position: 0,
+  #               text: 'ValidChange',
+  #               vectorClock: { client1: 1 },
+  #               clientId: '60d5f9f8f8a6f12a9c3e3a11'
+  #             },
+  #             {
+  #               type: 'insert',
+  #               position: 5,
+  #               text: 'InvalidChange',
+  #               vectorClock: { client1: 2 },
+  #               clientId: 'invalidObjectId'  # Invalid ObjectId
+  #             }
+  #           ]
+  #     - log: "Mixed valid and invalid client changes received and processed"

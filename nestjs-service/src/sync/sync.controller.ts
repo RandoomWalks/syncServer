@@ -12,7 +12,7 @@ export class SyncController {
         private readonly changeProcessorService: ChangeProcessorService,
         private readonly serverChangeTrackerService: ServerChangeTrackerService,
         private readonly goClientService: GoClientService,
-    ) {}
+    ) { }
 
     /**
      * Endpoint to receive client changes
@@ -38,10 +38,12 @@ export class SyncController {
         try {
             await this.changeProcessorService.processClientChanges(changeDtos);
             this.logger.log('Client changes processed successfully');
-            return { message: 'Client changes processed successfully' };
+            return { success: true, message: 'Client changes processed successfully' };
         } catch (error) {
             this.logger.error('Error processing client changes', error.stack);
-            throw error;
+            // throw error;
+            return { success: false, message: 'Error processing client changes', error: error.message };
+
         }
     }
 
@@ -104,10 +106,12 @@ export class SyncController {
         try {
             await this.changeProcessorService.resetDocument(body.initialDocument);
             this.logger.log('Document reset successfully');
-            return { message: 'Document reset successfully' };
+            return { success: true, message: 'Document reset successfully' };
         } catch (error) {
             this.logger.error('Error resetting document', error.stack);
-            throw error;
+            return { success: false, message: 'Error processing Document reset', error: error.message };
+
+            // throw error;
         }
     }
 
@@ -132,10 +136,12 @@ export class SyncController {
         try {
             await this.changeProcessorService.applyOperation(body.operation);
             this.logger.log('Operation applied successfully');
-            return { message: 'Operation applied successfully' };
+            return { success: true, message: 'Operation applied successfully' };
         } catch (error) {
             this.logger.error('Error applying operation', error.stack);
-            throw error;
+            return { success: false, message: 'Operation apply Error' ,error: error.message};
+
+            // throw error;
         }
     }
 
@@ -150,10 +156,12 @@ export class SyncController {
         try {
             const document = await this.changeProcessorService.getDocument();
             this.logger.log('Current document retrieved successfully');
-            return { document };
+            return {success: true, document };
         } catch (error) {
             this.logger.error('Error retrieving document', error.stack);
-            throw error;
+            return {success: true, message: 'Error retrieving document' ,error: error.message };
+
+            // throw error;
         }
     }
 }

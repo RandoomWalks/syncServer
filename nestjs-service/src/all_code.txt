@@ -1,0 +1,957 @@
+// import { VectorClock, Operation } from './ot.model';
+
+export interface VectorClock {
+    [clientId: string]: number;
+}
+
+export interface Operation {
+    type: 'insert' | 'delete';
+    position: number;
+    text?: string;
+    length?: number;
+    vectorClock: VectorClock;
+    clientId: string;
+}
+
+
+// Function to merge vector clocks
+function mergeVectorClocks(vc1: VectorClock, vc2: VectorClock): VectorClock {
+    const merged: VectorClock = { ...vc1 };
+    for (const clientId in vc2) {
+        merged[clientId] = Math.max(merged[clientId] || 0, vc2[clientId]);
+    }
+    return merged;
+}
+
+// Function to compare vector clocks
+function compareVectorClocks(vc1: VectorClock, vc2: VectorClock): number {
+    let isLess = false;
+    let isGreater = false;
+    for (const clientId in vc1) {
+        if ((vc2[clientId] || 0) < vc1[clientId]) {
+            isGreater = true;
+        } else if ((vc2[clientId] || 0) > vc1[clientId]) {
+            isLess = true;
+        }
+    }
+    for (const clientId in vc2) {
+        if ((vc1[clientId] || 0) < vc2[clientId]) {
+            isLess = true;
+        } else if ((vc1[clientId] || 0) > vc2[clientId]) {
+            isGreater = true;
+        }
+    }
+    return isLess && isGreater ? 0 : isLess ? -1 : isGreater ? 1 : 0;
+}
+
+// Function to apply an operation to a document
+function applyOperation(doc: string, op: Operation): string {
+    let newDoc: string;
+
+    switch (op.type) {
+        case 'insert':
+            newDoc = doc.slice(0, op.position) + (op.text || '') + doc.slice(op.position);
+            break;
+        case 'delete':
+            newDoc = doc.slice(0, op.position) + doc.slice(op.position + (op.length || 0));
+            break;
+        default:
+            throw new Error('Unsupported operation');
+    }
+
+    return newDoc;
+}
+
+export class OTDocument {
+    private doc: string;
+    private operations: Operation[];
+
+    constructor(initialDoc: string) {
+        this.doc = initialDoc;
+        this.operations = [];
+    }
+
+    public applyOperation(op: Operation): void {
+        const transformedOp = this.transformOperation(op);
+        this.doc = applyOperation(this.doc, transformedOp);
+        this.operations.push(transformedOp);
+    }
+
+    public getDocument(): string {
+        return this.doc;
+    }
+
+    private transformOperation(op: Operation): Operation {
+        let transformedOp = { ...op };
+
+        for (const existingOp of this.operations) {
+            if (compareVectorClocks(existingOp.vectorClock, op.vectorClock) < 0) {
+                transformedOp = this.transformAgainst(transformedOp, existingOp);
+            }
+        }
+
+        return transformedOp;
+    }
+
+    private transformAgainst(op: Operation, againstOp: Operation): Operation {
+        if (op.type === 'insert' && againstOp.type === 'insert') {
+            if (op.position > againstOp.position || (op.position === againstOp.position && op.clientId > againstOp.clientId)) {
+                return { ...op, position: op.position + (againstOp.text?.length || 0) };
+            }
+        } else if (op.type === 'delete' && againstOp.type === 'delete') {
+            if (op.position >= againstOp.position && op.position < againstOp.position + (againstOp.length || 0)) {
+                return { ...op, position: againstOp.position, length: 0 };
+            } else if (op.position > againstOp.position + (againstOp.length || 0)) {
+                return { ...op, position: op.position - (againstOp.length || 0) };
+            }
+        } else if (op.type === 'insert' && againstOp.type === 'delete') {
+            if (op.position >= againstOp.position + (againstOp.length || 0)) {
+                return { ...op, position: op.position - (againstOp.length || 0) };
+            }
+        } else if (op.type === 'delete' && againstOp.type === 'insert') {
+            if (op.position >= againstOp.position) {
+                return { ...op, position: op.position + (againstOp.text?.length || 0) };
+            }
+        }
+
+        return op;
+    }
+}
+import { ObjectId } from 'mongodb';
+
+export interface ReceiveClientChangesReq {
+    changes: (DeleteChange | CreateChange | UpdateChange)[];
+}
+
+
+
+export type ChangeType = 'create' | 'update' | 'delete';
+
+export interface DeleteChange {
+    type: ChangeType;
+    data: {
+        _id: ObjectId;
+    }
+}
+
+export interface UpdateChange extends DeleteChange {
+    data: {
+        _id: ObjectId;
+        name?: string;
+    }
+}
+
+export interface CreateChange extends DeleteChange {
+    data: {
+        _id: ObjectId;
+        name?: string;
+    }
+}
+import { ObjectId } from 'mongodb';
+import { OTDocument, Operation,VectorClock } from '../../crdt/ot-document.model';
+
+export type ChangeType = 'create' | 'update' | 'delete';
+
+export interface DeleteChange {
+    type: ChangeType;
+    data: {
+        _id: ObjectId;
+    }
+}
+
+export interface UpdateChange extends DeleteChange {
+    data: {
+        _id: ObjectId;
+        name?: string;
+    }
+}
+
+export interface CreateChange extends DeleteChange {
+    data: {
+        _id: ObjectId;
+        name?: string;
+    }
+}
+
+// export class ChangeDto {
+//     type: ChangeType;
+//     data: any;
+// }
+
+
+// models/external/change.dto.ts
+
+export interface ChangeDto {
+  type: "insert" | "delete";
+  position: number;
+  vectorClock: VectorClock;
+  clientId: string;
+  text?: string;
+  length?: number;
+}
+import { ObjectId } from 'mongodb';
+
+export class Change {
+    _id: ObjectId;
+    type: 'create' | 'update' | 'delete';
+    data: any;
+    vectorClock: { [nodeId: string]: number };
+    updatedAt: Date;
+}
+import { Module } from '@nestjs/common';
+import { ChangeProcessorService } from './change-processor.service';
+import { DatabaseModule } from '../database/database.module';
+
+@Module({
+    imports: [DatabaseModule],
+    providers: [ChangeProcessorService],
+    exports: [ChangeProcessorService],
+})
+export class ChangeProcessorModule { }
+
+// // services/change-processor.service.ts
+// import { Injectable, Logger } from '@nestjs/common';
+// import { DatabaseService } from '../database/database.service';
+// import { Change } from '../models/internal/change.model';
+// import { ChangeConverter } from '../converters/change.converter';
+// import { ChangeDto } from '../models/external/change.dto';
+// import { Db, MongoServerError } from 'mongodb';
+
+// @Injectable()
+// export class ChangeProcessorService {
+//     private readonly logger = new Logger(ChangeProcessorService.name);
+
+//     constructor(private readonly databaseService: DatabaseService) { }
+
+//     async processClientChanges(changeDtos: ChangeDto[]): Promise<void> {
+//         this.logger.log('Processing client changes');
+//         const changes: Change[] = changeDtos.map(ChangeConverter.toInternal);
+
+//         try {
+//             const db: Db = await this.databaseService.getDb();
+//             const collection = db.collection('client-changes');
+
+//             for (const change of changes) {
+//                 try {
+//                     switch (change.type) {
+//                         case 'create':
+//                             this.logger.debug(`Creating document: ${JSON.stringify(change.data)}`);
+//                             await collection.insertOne(change.data);
+//                             break;
+//                         case 'update':
+//                             this.logger.debug(`Updating document with _id: ${change.data._id}`);
+//                             await collection.updateOne({ _id: change.data._id }, { $set: change.data });
+//                             break;
+//                         case 'delete':
+//                             this.logger.debug(`Deleting document with _id: ${change.data._id}`);
+//                             await collection.deleteOne({ _id: change.data._id });
+//                             break;
+//                         default:
+//                             this.logger.warn(`Unknown change type: ${change.type}`);
+//                     }
+//                 } catch (error) {
+//                     if (error instanceof MongoServerError && error.code === 11000) {
+//                         this.logger.error('Duplicate key error', error);
+//                         await collection.updateOne({ _id: change.data._id }, { $set: change.data });
+//                     } else {
+//                         this.logger.error('Error processing client changes', error.stack);
+//                         throw error;
+//                     }
+//                 }
+//             }
+
+//             this.logger.log('Client changes processed successfully');
+//         } catch (error) {
+//             this.logger.error('Error processing client changes', error.stack);
+//             throw error;
+//         }
+//     }
+
+//     async getServerChanges(since: Date): Promise<ChangeDto[]> {
+//         this.logger.log('Retrieving server changes');
+//         try {
+//             const db: Db = await this.databaseService.getDb();
+//             const collection = db.collection('client-changes');
+//             //   const changes = await collection.find({ updatedAt: { $gt: since } }).toArray();
+//             const changes = await collection.find({ updatedAt: { $gt: since } }).toArray() || []; // Handle undefined case
+
+//             return changes.map(ChangeConverter.toExternal);
+//         } catch (error) {
+//             this.logger.error('Error retrieving server changes', error.stack);
+//             throw error;
+//         }
+//     }
+// }
+
+
+
+// services/change-processor.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+import { DatabaseService } from '../database/database.service';
+import { Change } from '../models/internal/change.model';
+import { ChangeConverter } from '../converters/change.converter';
+import { ChangeDto } from '../models/external/change.dto';
+import { Db, MongoServerError, ObjectId, WithId } from 'mongodb';
+
+
+import { OTDocument, Operation, VectorClock } from '../crdt/ot-document.model';
+
+// @Injectable()
+// export class ChangeProcessorService {
+//     private readonly logger = new Logger(ChangeProcessorService.name);
+//     private otDocument: OTDocument;
+
+//     constructor(private readonly databaseService: DatabaseService) {
+//         // Initialize OTDocument with an empty document or load the initial state from the database
+//         this.otDocument = new OTDocument('');
+//     }
+
+//     async processClientChanges(changeDtos: ChangeDto[]): Promise<void> {
+//         this.logger.log('Processing client changes');
+//         const operations: Operation[] = changeDtos.map(ChangeConverter.toInternal);
+
+//         try {
+//             const db: Db = await this.databaseService.getDb();
+//             const collection = db.collection('client-changes');
+
+//             // Apply operations and prepare bulk operations for the database
+//             const bulkOps = operations.map(operation => {
+//                 this.otDocument.applyOperation(operation);
+
+//                 return {
+//                     updateOne: {
+//                         filter: { _id: new ObjectId (operation.clientId )},
+//                         update: { $set: { ...operation, vectorClock: operation.vectorClock } },
+//                         upsert: true,
+//                     },
+//                 };
+//             });
+
+//             await collection.bulkWrite(bulkOps);
+
+//             this.logger.log('Client changes processed successfully');
+//         } catch (error) {
+//             this.logger.error('Error processing client changes', error.stack);
+//             throw error;
+//         }
+//     }
+
+//     async getServerChanges(since: Date): Promise<ChangeDto[]> {
+//         this.logger.log('Retrieving server changes');
+//         try {
+//             const db: Db = await this.databaseService.getDb();
+//             const collection = db.collection('client-changes');
+//             // const changes = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
+
+//             const changes: WithId<Document>[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
+
+            
+//             return changes.map(ChangeConverter.toExternal);
+//         } catch (error) {
+//             this.logger.error('Error retrieving server changes', error.stack);
+//             throw error;
+//         }
+//     }
+
+//     private generateVectorClock(): VectorClock {
+//         const clientId = 'client-1'; // Replace with your client ID logic
+//         const timestamp = Date.now();
+//         return { [clientId]: timestamp };
+//     }
+// }
+ 
+// Define the type of document stored in MongoDB
+export interface ChangeDocument {
+    _id: ObjectId;
+    type: "insert" | "delete";
+    position: number;
+    vectorClock: VectorClock;
+    clientId: string;
+    text?: string;
+    length?: number;
+    updatedAt: Date;
+  }
+
+  
+@Injectable()
+export class ChangeProcessorService {
+    private readonly logger = new Logger(ChangeProcessorService.name);
+    private otDocument: OTDocument;
+
+    constructor(private readonly databaseService: DatabaseService) {
+        // Initialize OTDocument with an empty document or load the initial state from the database
+        this.otDocument = new OTDocument('');
+    }
+
+    async processClientChanges(changeDtos: ChangeDto[]): Promise<void> {
+        this.logger.log('Processing client changes');
+        const operations: Operation[] = changeDtos.map(ChangeConverter.toInternal);
+
+        try {
+            const db: Db = await this.databaseService.getDb();
+            const collection = db.collection<ChangeDocument>('client-changes');
+
+            // Apply operations and prepare bulk operations for the database
+            const bulkOps = operations.map(operation => {
+                this.otDocument.applyOperation(operation);
+
+                return {
+                    updateOne: {
+                        filter: { _id: new ObjectId(operation.clientId) },
+                        update: { $set: { ...operation, vectorClock: operation.vectorClock } },
+                        upsert: true,
+                    },
+                };
+            });
+
+            await collection.bulkWrite(bulkOps);
+
+            this.logger.log('Client changes processed successfully');
+        } catch (error) {
+            this.logger.error('Error processing client changes', error.stack);
+            throw error;
+        }
+    }
+
+    async getServerChanges(since: Date): Promise<ChangeDto[]> {
+        this.logger.log('Retrieving server changes');
+        try {
+            const db: Db = await this.databaseService.getDb();
+            const collection = db.collection('client-changes');
+            const changes: WithId<Document>[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
+            
+            // Convert the documents to ChangeDto
+            return changes.map(doc => {
+                const operation: Operation = {
+                    type: doc.type,
+                    position: doc.position,
+                    vectorClock: doc.vectorClock,
+                    clientId: doc.clientId,
+                    ...(doc.text && { text: doc.text }),
+                    ...(doc.length && { length: doc.length }),
+                };
+                return ChangeConvertfchangeer.toExternal(operation);
+            });
+        } catch (error) {
+            this.logger.error('Error retrieving server changes', error.stack);
+            throw error;
+        }
+    }
+
+    private generateVectorClock(): VectorClock {
+        const clientId = 'client-1'; // Replace with your client ID logic
+        const timestamp = Date.now();
+        return { [clientId]: timestamp };
+    }
+}
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AppService {
+  getHello(): string {
+    return 'Hello World!';
+  }
+}
+// app.module.ts
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { ChangeProcessorModule } from './change-processor/change-processor.module';
+import { DatabaseModule } from './database/database.module';
+import { ServerChangeTrackerModule } from './server-change-tracker/server-change-tracker.module';
+import { SyncModule } from './sync/sync.module';
+import { HttpModule } from '@nestjs/axios';
+import { GoClientService } from './sync/go-client.service';
+
+@Module({
+  imports: [ChangeProcessorModule, DatabaseModule, ServerChangeTrackerModule, SyncModule, HttpModule],
+  controllers: [AppController],
+  providers: [AppService, GoClientService],
+})
+export class AppModule {}
+
+// import { Module } from '@nestjs/common';
+// import { AppController } from './app.controller';
+// import { AppService } from './app.service';
+// import { ChangeProcessorModule } from './modules/change-processor.module';
+// import { DatabaseModule } from './modules/database.module';
+// import { ServerChangeTrackerModule } from './modules/server-change-tracker.module';
+// import { SyncModule } from './modules/sync.module';
+// import { HttpModule } from '@nestjs/axios';
+
+// @Module({
+//     imports: [ChangeProcessorModule, DatabaseModule, ServerChangeTrackerModule, SyncModule, HttpModule],
+//     controllers: [AppController],
+//     providers: [AppService],
+// })
+// export class AppModule {}
+import { Module } from '@nestjs/common';
+import { DatabaseService } from './database.service';
+
+@Module({
+  providers: [DatabaseService],
+  exports: [DatabaseService],
+})
+export class DatabaseModule {}
+
+// import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+// import { MongoClient, Db } from 'mongodb';
+
+// @Injectable()
+// export class DatabaseService implements OnModuleInit, OnModuleDestroy {
+//     private db: Db;
+//     private client: MongoClient;
+//     private readonly logger = new Logger(DatabaseService.name);
+
+//     async onModuleInit(): Promise<void> {
+//         const uri = process.env.DATABASE_URL || 'mongodb://mongo:27017/mydb';
+//         this.logger.log(`Connecting to MongoDB at ${uri}`);
+        
+//         try {
+//             this.client = new MongoClient(uri);
+//             await this.client.connect();
+//             this.db = this.client.db('mydb');
+//             this.logger.log('Successfully connected to MongoDB');
+//         } catch (error) {
+//             this.logger.error('Error connecting to MongoDB', error.stack);
+//             throw error;
+//         }
+//     }
+
+//     getDb(): Db {
+//         if (!this.db) {
+//             throw new Error('Database connection is not initialized.');
+//         }
+//         return this.db;
+//     }
+
+//     async onModuleDestroy(): Promise<void> {
+//         if (this.client) {
+//             this.logger.log('Closing MongoDB connection');
+//             try {
+//                 await this.client.close();
+//                 this.logger.log('MongoDB connection closed successfully');
+//             } catch (error) {
+//                 this.logger.error('Error closing MongoDB connection', error.stack);
+//             }
+//         }
+//     }
+// }
+
+
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { MongoClient, Db } from 'mongodb';
+
+@Injectable()
+export class DatabaseService implements OnModuleInit, OnModuleDestroy {
+    private db: Db;
+    private client: MongoClient;
+    private readonly logger = new Logger(DatabaseService.name);
+
+    async onModuleInit(): Promise<void> {
+        const uri = process.env.DATABASE_URL || 'mongodb://mongo:27017/mydb';
+        this.logger.log(`Connecting to MongoDB at ${uri}`);
+        
+        try {
+            this.client = new MongoClient(uri);
+            await this.client.connect();
+            this.db = this.client.db('mydb');
+            this.logger.log('Successfully connected to MongoDB');
+
+            // Ensure indexes are created
+            await this.createIndexes();
+        } catch (error) {
+            this.logger.error('Error connecting to MongoDB', error.stack);
+            throw error;
+        }
+    }
+
+    getDb(): Db {
+        if (!this.db) {
+            throw new Error('Database connection is not initialized.');
+        }
+        return this.db;
+    }
+
+    async onModuleDestroy(): Promise<void> {
+        if (this.client) {
+            this.logger.log('Closing MongoDB connection');
+            try {
+                await this.client.close();
+                this.logger.log('MongoDB connection closed successfully');
+            } catch (error) {
+                this.logger.error('Error closing MongoDB connection', error.stack);
+            }
+        }
+    }
+
+    private async createIndexes(): Promise<void> {
+        const collection = this.db.collection('client-changes');
+        await collection.createIndex({ updatedAt: 1 });
+        await collection.createIndex({ 'data._id': 1 });
+    }
+}
+import { Test, TestingModule } from '@nestjs/testing';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+describe('AppController', () => {
+    let appController: AppController;
+
+    beforeEach(async () => {
+        const app: TestingModule = await Test.createTestingModule({
+            controllers: [AppController],
+            providers: [AppService],
+        }).compile();
+
+        appController = app.get<AppController>(AppController);
+    });
+
+    describe('root', () => {
+        it('should return "Hello World!"', () => {
+            expect(appController.getHello()).toBe('Hello World!');
+        });
+    });
+});
+import { Module } from '@nestjs/common';
+import { SyncController } from './sync.controller';
+import { ChangeProcessorModule } from '../change-processor/change-processor.module';
+import { ServerChangeTrackerModule } from '../server-change-tracker/server-change-tracker.module';
+import { GoClientService } from './go-client.service';
+import { HttpModule } from '@nestjs/axios';
+
+@Module({
+  imports: [HttpModule,ChangeProcessorModule, ServerChangeTrackerModule],
+  controllers: [SyncController],
+  providers: [GoClientService],
+})
+export class SyncModule {}
+    
+
+
+// import { Injectable, HttpService } from '@nestjs/common';
+
+// @Injectable()
+// export class GoClientService {
+//   constructor(private readonly httpService: HttpService) {}
+
+//   async syncData(data: string[]): Promise<any> {
+//     const response = await this.httpService.post('http://go-service:8080/sync', { data }).toPromise();
+//     return response.data;
+//   }
+// }
+
+import { Injectable, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { ChangeDto } from '../models/external/change.dto';
+
+@Injectable()
+export class GoClientService {
+  private readonly logger = new Logger(GoClientService.name);
+
+  constructor(private readonly httpService: HttpService) { }
+
+  async syncData(data: ChangeDto[]): Promise<any> {
+    this.logger.log('Sending data to Go service');
+    const response = await this.httpService.post('http://go-service:8080/sync', { data }).toPromise();
+    this.logger.log('Received response from Go service');
+    return response.data;
+  }
+}
+// import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
+// import { ChangeProcessorService } from '../change-processor/change-processor.service';
+// import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
+// import { GoClientService } from './go-client.service';
+// import { ChangeDto } from '../models/external/change.dto';
+
+// import { Db, MongoServerError, ObjectId } from 'mongodb';
+// import { ReceiveClientChangesReq } from '../models'
+
+
+// @Controller('sync')
+// export class SyncController {
+//     private readonly logger = new Logger(SyncController.name);
+
+//     constructor(
+//         private readonly changeProcessorService: ChangeProcessorService,
+//         private readonly serverChangeTrackerService: ServerChangeTrackerService,
+//         private readonly goClientService: GoClientService,
+//     ) { }
+
+
+//     @Post('client-changes')
+//         async receiveClientChanges(@Body() changes: ChangeDto[]): Promise<any> {
+
+//         this.logger.log('Received client changes');
+//         this.logger.debug(`Client changes data: ${JSON.stringify(changes)}`);
+
+//         try {
+//             await this.changeProcessorService.processClientChanges(changes);
+//             this.logger.log('Client changes processed successfully');
+//             return { message: 'Client changes processed successfully' };
+//         } catch (error) {
+//             this.logger.error('Error processing client changes', error.stack);
+//             throw error;
+//         }
+//     }
+
+//     @Get('server-changes')
+//     async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
+//         // parameter extracted from URL: ie https://example.com/api/items?since=2023-01-01T00:00:00Z
+
+//         this.logger.log('Received request for server changes');
+//         this.logger.debug(`Query parameter 'since': ${since}`);
+
+//         const changesSince = new Date(since);
+//         if (isNaN(changesSince.getTime())) {
+//             this.logger.error('Invalid date format');
+//             throw new Error('Invalid time value');
+//         }
+        
+//         try {
+//             this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
+
+//             const changes = await this.changeProcessorService.getServerChanges(changesSince);
+//             this.logger.log('Server changes retrieved successfully');
+//             return changes;
+//         } catch (error) {
+//             this.logger.error('Error retrieving server changes', error.stack);
+//             throw error;
+//         }
+//     }
+
+
+//     @Post('process')
+//     async processData(@Body() body: { data: ChangeDto[] }) {
+//         return this.goClientService.syncData(body.data);
+//     }
+// }
+
+
+import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
+import { ChangeProcessorService } from '../change-processor/change-processor.service';
+import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
+import { GoClientService } from './go-client.service';
+import { ChangeDto } from '../models/external/change.dto';
+
+@Controller('sync')
+export class SyncController {
+    private readonly logger = new Logger(SyncController.name);
+
+    constructor(
+        private readonly changeProcessorService: ChangeProcessorService,
+        private readonly serverChangeTrackerService: ServerChangeTrackerService,
+        private readonly goClientService: GoClientService,
+    ) {}
+
+    @Post('client-changes')
+    async receiveClientChanges(@Body() changes: ChangeDto[]): Promise<any> {
+        this.logger.log('Received client changes');
+        this.logger.debug(`Client changes data: ${JSON.stringify(changes)}`);
+        try {
+            await this.changeProcessorService.processClientChanges(changes);
+            this.logger.log('Client changes processed successfully');
+            return { message: 'Client changes processed successfully' };
+        } catch (error) {
+            this.logger.error('Error processing client changes', error.stack);
+            throw error;
+        }
+    }
+
+    @Get('server-changes')
+    async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
+        this.logger.log('Received request for server changes');
+        this.logger.debug(`Query parameter 'since': ${since}`);
+        const changesSince = new Date(since);
+        if (isNaN(changesSince.getTime())) {
+            this.logger.error('Invalid date format');
+            throw new Error('Invalid time value');
+        }
+        try {
+            this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
+            const changes = await this.changeProcessorService.getServerChanges(changesSince);
+            this.logger.log('Server changes retrieved successfully');
+            return changes;
+        } catch (error) {
+            this.logger.error('Error retrieving server changes', error.stack);
+            throw error;
+        }
+    }
+
+    @Post('process')
+    async processData(@Body() body: { data: ChangeDto[] }) {
+        return this.goClientService.syncData(body.data);
+    }
+}
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
+  console.log('Application is running on: http://localhost:3000');
+
+}
+bootstrap();
+// // converters/change.converter.ts
+// import { Change } from '../models/internal/change.model';
+// import { ChangeDto } from '../models/external/change.dto';
+
+// export class ChangeConverter {
+//   static toInternal(changeDto: ChangeDto): Change {
+//     if (!changeDto || !changeDto.data) {
+//       return undefined;
+//     }
+//     return {
+//       _id: changeDto.data._id, // Assuming data contains _id
+//       type: changeDto.type,
+//       data: changeDto.data,
+//       updatedAt: new Date()
+//     };
+//   }
+
+//   static toExternal(change: Change): ChangeDto {
+//     if (!change) {
+//       //  'undefined' denotes that a variable has been declared, but hasn't been assigned any value.
+//       return undefined;
+//     }
+//     return {
+//       type: change.type,
+//       data: change.data
+//     };
+//   }
+// }
+
+import { ChangeDto } from '../models/external/change.dto';
+import { Operation } from '../crdt/ot-document.model';
+import { ChangeDocument } from '../change-processor/change-processor.service'; // Ensure this path is correct
+
+// export class ChangeConverter {
+//     static toInternal(changeDto: ChangeDto): Operation {
+//         if (!changeDto || !changeDto.data) {
+//             return undefined;
+//         }
+//         return {
+//             type: changeDto.type as 'insert' | 'delete',
+//             position: changeDto.data.position,
+//             text: changeDto.data.text,
+//             length: changeDto.data.length,
+//             vectorClock: changeDto.vectorClock || {},
+//             clientId: changeDto.clientId,
+//         };
+//     }
+
+//     static toExternal(operation: Operation): ChangeDto {
+//         if (!operation) {
+//             return undefined;
+//         }
+//         return {
+//             type: operation.type,
+//             data: {
+//                 position: operation.position,
+//                 text: operation.text,
+//                 length: operation.length,
+//             },
+//             vectorClock: operation.vectorClock,
+//             clientId: operation.clientId,
+//         };
+//     }
+// }
+
+
+
+export class ChangeConverter {
+  static toInternal(changeDto: ChangeDto): Operation {
+    return {
+      type: changeDto.type,
+      position: changeDto.position,
+      vectorClock: changeDto.vectorClock,
+      clientId: changeDto.clientId,
+      ...(changeDto.text && { text: changeDto.text }),
+      ...(changeDto.length && { length: changeDto.length }),
+    };
+  }
+
+  static toExternal(doc: ChangeDocument): ChangeDto {
+    return {
+      type: doc.type,
+      position: doc.position,
+      vectorClock: doc.vectorClock,
+      clientId: doc.clientId,
+      text: doc.text,
+      length: doc.length,
+    };
+  }
+}import { Module } from '@nestjs/common';
+import { ServerChangeTrackerService } from './server-change-tracker.service';
+import { DatabaseModule } from '../database/database.module';
+
+@Module({
+    imports: [DatabaseModule],
+    providers: [ServerChangeTrackerService],
+    exports: [ServerChangeTrackerService],
+})
+export class ServerChangeTrackerModule { }
+import { Injectable, Logger } from '@nestjs/common';
+import { DatabaseService } from '../database/database.service';
+import { Change } from '../models/internal/change.model';
+import { ChangeDto } from '../models/external/change.dto';
+import { ChangeConverter } from '../converters/change.converter';
+
+@Injectable()
+export class ServerChangeTrackerService {
+    private readonly logger = new Logger(ServerChangeTrackerService.name);
+
+    constructor(private readonly databaseService: DatabaseService) {}
+
+    async trackChange(changeDto: ChangeDto): Promise<void> {
+        this.logger.log('Tracking change');
+        const change: Change = ChangeConverter.toInternal(changeDto);
+
+        try {
+            const db = await this.databaseService.getDb();
+            const collection = db.collection('change-tracker');
+            await collection.insertOne(change);
+            this.logger.log('Change tracked successfully');
+        } catch (error) {
+            this.logger.error('Error tracking change', error.stack);
+            throw error;
+        }
+    }
+
+    async getChangesSince(timestamp: Date): Promise<ChangeDto[]> {
+        this.logger.log('Retrieving changes since timestamp');
+        try {
+            const db = await this.databaseService.getDb();
+            const collection = db.collection('change-tracker');
+            const changes = await collection.find({ timestamp: { $gt: timestamp } }).toArray();
+            if (!changes) {
+                throw new Error('Failed to retrieve changes from the database');
+            }
+            return changes.map((doc) => {
+                const change: Change = {
+                    _id: doc._id,
+                    type: doc.type,
+                    data: doc.data,
+                    updatedAt: doc.updatedAt,
+                };
+                return ChangeConverter.toExternal(change);
+            });
+        } catch (error) {
+            this.logger.error('Error retrieving changes', error.stack);
+            throw error;
+        }
+    }
+}
+import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor(private readonly appService: AppService) {}
+
+  @Get()
+  getHello(): string {
+    return this.appService.getHello();
+  }
+}

@@ -8,11 +8,12 @@ import { ServerChangeTrackerModule } from './server-change-tracker/server-change
 import { SyncModule } from './sync/sync.module';
 import { HttpModule } from '@nestjs/axios';
 import { GoClientService } from './sync/go-client.service';
+import { WebsocketGateway } from './websocket/websocket.gateway';
 
 @Module({
   imports: [ChangeProcessorModule, DatabaseModule, ServerChangeTrackerModule, SyncModule, HttpModule],
   controllers: [AppController],
-  providers: [AppService, GoClientService],
+  providers: [AppService, GoClientService,WebsocketGateway],
 })
 export class AppModule {}
 

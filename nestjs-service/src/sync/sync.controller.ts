@@ -1,11 +1,15 @@
 import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
 import { ChangeProcessorService } from '../change-processor/change-processor.service';
+import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { Server } from 'socket.io';
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
 import { GoClientService } from './go-client.service';
 import { ChangeDto } from '../models/external/change.dto';
 
+@WebSocketGateway()
 @Controller('sync')
 export class SyncController {
+    @WebSocketServer() server: Server;
     private readonly logger = new Logger(SyncController.name);
 
     constructor(

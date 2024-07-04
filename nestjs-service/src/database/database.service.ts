@@ -27,7 +27,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         const uri = this.configService.get<string>('MONGO_URI');
         // const uri  ="mongodb://ab4745802:E1XuVmfq825LfV9o@cluster0-shard-00-00.mongodb.net:27017,cluster0-shard-00-01.mongodb.net:27017,cluster0-shard-00-02.mongodb.net:27017/mydb?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin&retryWrites=true&w=majority";
 
-
         this.logger.log(`Connecting to MongoDB at ${uri}`);
 
         try {

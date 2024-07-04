@@ -19,7 +19,7 @@ RUN ls -la /usr/src/app/dist
 
 
 # Set DNS servers
-RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
-RUN echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+# RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
+# RUN echo "nameserver 1.1.1.1" >> /etc/resolv.conf
 
 CMD ["npm", "run", "start:prod"]

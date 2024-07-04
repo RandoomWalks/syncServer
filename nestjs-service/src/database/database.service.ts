@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { MongoClient, Db } from 'mongodb';
 import { ConfigService } from '@nestjs/config';
-import * as dns from 'dns';
+// import * as dns from 'dns';
 
-dns.setServers(['8.8.8.8', '1.1.1.1']);
+// dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 
 @Injectable()
@@ -13,8 +13,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(DatabaseService.name);
 
     constructor(private configService: ConfigService) {
-        // const uri = this.configService.get<string>('MONGO_URI');
-        const uri = "mongodb://ab4745802:E1XuVmfq825LfV9o@cluster0-shard-00-00.mongodb.net:27017,cluster0-shard-00-01.mongodb.net:27017,cluster0-shard-00-02.mongodb.net:27017/mydb?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin&retryWrites=true&w=majority";
+        const uri = this.configService.get<string>('MONGO_URI');
+        // const uri = "mongodb://ab4745802:E1XuVmfq825LfV9o@cluster0-shard-00-00.mongodb.net:27017,cluster0-shard-00-01.mongodb.net:27017,cluster0-shard-00-02.mongodb.net:27017/mydb?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin&retryWrites=true&w=majority";
+
         this.client = new MongoClient(uri);
         // this.client = new MongoClient(this.configService.get<string>('MONGO_URI'));
     }
@@ -22,9 +23,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
 
     async onModuleInit(): Promise<void> {
-        // const uri = process.env.DATABASE_URL || 'mongodb://mongo:27017/mydb';
-        // const uri = this.configService.get<string>('MONGO_URI');
-        const uri  ="mongodb://ab4745802:E1XuVmfq825LfV9o@cluster0-shard-00-00.mongodb.net:27017,cluster0-shard-00-01.mongodb.net:27017,cluster0-shard-00-02.mongodb.net:27017/mydb?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin&retryWrites=true&w=majority";
+        // const uri = process.env.LOCAL_DATABASE_URL || 'mongodb://mongo:27017/mydb';
+        const uri = this.configService.get<string>('MONGO_URI');
+        // const uri  ="mongodb://ab4745802:E1XuVmfq825LfV9o@cluster0-shard-00-00.mongodb.net:27017,cluster0-shard-00-01.mongodb.net:27017,cluster0-shard-00-02.mongodb.net:27017/mydb?ssl=true&replicaSet=Cluster0-shard-0&authSource=admin&retryWrites=true&w=majority";
 
 
         this.logger.log(`Connecting to MongoDB at ${uri}`);

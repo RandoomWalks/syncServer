@@ -18,7 +18,7 @@ export class ServerChangeTrackerService {
         const change: ChangeDocument = {
             ...ChangeConverter.toInternal(changeDto),
             _id:new ObjectId(), 
-            updatedAt:new Date(),
+            updatedAt:new Date().valueOf().toString(),
         }
 
         try {

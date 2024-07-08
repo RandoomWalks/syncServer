@@ -30,7 +30,9 @@ export class SyncController {
     @Post('client-changes')
     async receiveClientChanges(@Body() changeDtos: ChangeDto[]): Promise<any> {
         this.logger.log('Received client changes');
+        console.log('Received client changes');
         this.logger.debug(`Client changes data: ${JSON.stringify(changeDtos)}`);
+        console.log(`Client changes data: ${JSON.stringify(changeDtos)}`);
 
         // Add logging to check the structure
         console.log('Received changeDtos:', changeDtos);
@@ -38,9 +40,11 @@ export class SyncController {
         try {
             await this.changeProcessorService.processClientChanges(changeDtos);
             this.logger.log('Client changes processed successfully');
+            console.log('Client changes processed successfully');
             return { success: true, message: 'Client changes processed successfully' };
         } catch (error) {
             this.logger.error('Error processing client changes', error.stack);
+            console.error('Error processing client changes', error.stack);
             // throw error;
             return { success: false, message: 'Error processing client changes', error: error.message };
 
@@ -54,19 +58,25 @@ export class SyncController {
     @Get('server-changes')
     async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
         this.logger.log('Received request for server changes');
+        console.log('Received request for server changes');
         this.logger.debug(`Query parameter 'since': ${since}`);
+        console.log(`Query parameter 'since': ${since}`);
         const changesSince = new Date(since);
         if (isNaN(changesSince.getTime())) {
             this.logger.error('Invalid date format');
+            console.error('Invalid date format');
             throw new Error('Invalid time value');
         }
         try {
             this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
-            const changes = await this.changeProcessorService.getServerChanges(changesSince);
+            console.log(`Parsed date: ${changesSince.toISOString()}`);
+            const changes: ChangeDto[] = await this.changeProcessorService.getServerChanges(changesSince);
             this.logger.log('Server changes retrieved successfully');
+            console.log('Server changes retrieved successfully:', changes);
             return changes;
         } catch (error) {
             this.logger.error('Error retrieving server changes', error.stack);
+            console.error('Error retrieving server changes', error.stack);
             throw error;
         }
     }
@@ -101,14 +111,18 @@ export class SyncController {
     @Post('reset-document')
     async resetDocument(@Body() body: { initialDocument: string }): Promise<any> {
         this.logger.log('Received request to reset document');
+        console.log('Received request to reset document');
         this.logger.debug(`Initial document: ${body.initialDocument}`);
+        console.log(`Initial document: ${body.initialDocument}`);
 
         try {
             await this.changeProcessorService.resetDocument(body.initialDocument);
             this.logger.log('Document reset successfully');
+            console.log('Document reset successfully');
             return { success: true, message: 'Document reset successfully' };
         } catch (error) {
             this.logger.error('Error resetting document', error.stack);
+            console.error('Error resetting document', error.stack);
             return { success: false, message: 'Error processing Document reset', error: error.message };
 
             // throw error;
@@ -131,15 +145,19 @@ export class SyncController {
     @Post('apply-operation')
     async applyOperation(@Body() body: { operation: ChangeDto }): Promise<any> {
         this.logger.log('Received request to apply operation');
+        console.log('Received request to apply operation');
         this.logger.debug(`Operation data: ${JSON.stringify(body.operation)}`);
+        console.log(`Operation data: ${JSON.stringify(body.operation)}`);
 
         try {
             await this.changeProcessorService.applyOperation(body.operation);
             this.logger.log('Operation applied successfully');
+            console.log('Operation applied successfully');
             return { success: true, message: 'Operation applied successfully' };
         } catch (error) {
             this.logger.error('Error applying operation', error.stack);
-            return { success: false, message: 'Operation apply Error' ,error: error.message};
+            console.error('Error applying operation', error.stack);
+            return { success: false, message: 'Operation apply Error', error: error.message };
 
             // throw error;
         }
@@ -152,14 +170,17 @@ export class SyncController {
     @Get('document')
     async getDocument(): Promise<any> {
         this.logger.log('Received request to get current document');
+        console.log('Received request to get current document');
 
         try {
             const document = await this.changeProcessorService.getDocument();
             this.logger.log('Current document retrieved successfully');
-            return {success: true, document };
+            console.log('Current document retrieved successfully');
+            return { success: true, document };
         } catch (error) {
             this.logger.error('Error retrieving document', error.stack);
-            return {success: true, message: 'Error retrieving document' ,error: error.message };
+            console.error('Error retrieving document', error.stack);
+            return { success: true, message: 'Error retrieving document', error: error.message };
 
             // throw error;
         }

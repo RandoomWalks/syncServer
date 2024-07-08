@@ -11,6 +11,7 @@ export interface Operation {
     length?: number;
     vectorClock: VectorClock;
     clientId: string;
+    updatedAt: string;
 }
 
 

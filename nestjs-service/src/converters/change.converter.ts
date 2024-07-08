@@ -12,6 +12,7 @@ export class ChangeConverter {
       clientId: changeDto.clientId,
       ...(changeDto.text && { text: changeDto.text }),
       ...(changeDto.length && { length: changeDto.length }),
+      ...(changeDto.updatedAt && { updatedAt: changeDto.updatedAt.valueOf().toString() }),
     };
   }
 
@@ -23,6 +24,7 @@ export class ChangeConverter {
       clientId: doc.clientId,
       text: doc.text,
       length: doc.length,
+      updatedAt:new Date(parseInt(doc.updatedAt)),
     };
   }
 }

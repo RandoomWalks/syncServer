@@ -16,7 +16,7 @@ export class ChangeProcessorService {
         // Initialize OTDocument with an empty document or load the initial state from the database
         this.otDocument = new OTDocument('');
     }
-    
+
     async resetDocument(initialDocument: string): Promise<void> {
         this.logger.log('Resetting document');
         this.otDocument = new OTDocument(initialDocument);
@@ -65,13 +65,18 @@ export class ChangeProcessorService {
                 return {
                     updateOne: {
                         filter: { _id: clientId },
-                        update: { $set: { ...operation, clientId, vectorClock: operation.vectorClock } },
+                        update: { $set: { ...operation, clientId, vectorClock: operation.vectorClock, updatedAt: operation.updatedAt } },
                         upsert: true,
                     },
                 };
             });
 
             await collection.bulkWrite(bulkOps);
+
+            bulkOps.forEach(op => {
+                console.log(`updatedAt for clientId ${op.updateOne.filter._id}: ${op.updateOne.update.$set.updatedAt}`);
+                // console.log(`${op.updateOne.update.$set.updatedAt}`)
+            })
 
             this.logger.log('Client changes processed successfully');
         } catch (error) {
@@ -83,13 +88,22 @@ export class ChangeProcessorService {
     async getServerChanges(since: Date): Promise<ChangeDto[]> {
         this.logger.log('Retrieving server changes');
         try {
+            console.log("getServerChanges() START get changes since:", since);
             const db: Db = await this.databaseService.getDb();
             const collection = db.collection<ChangeDocument>('client-changes');
-            const changes: ChangeDocument[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
-            
+
+            // const changes: ChangeDocument[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
+            const changes: ChangeDocument[] = await collection
+                .find({ updatedAt: { $gt: since.valueOf().toString() } })    // selects documents where the updatedAt field value is greater than since.
+                .sort({ updatedAt: 1 }) // sorted chronologically, starting from the earliest.
+                .toArray() || [];
+
+            console.log("getServerChanges() changes ChangeDocument[]:", changes);
             // Convert the documents to ChangeDto
             return changes.map(doc => {
-                return ChangeConverter.toExternal(doc);
+                let transformedChange = ChangeConverter.toExternal(doc);
+                console.log("getServerChanges() transformedChange:", transformedChange);
+                return transformedChange; // returns the result of converting each ChangeDocument (doc) to a ChangeDto
             });
         } catch (error) {
             this.logger.error('Error retrieving server changes', error.stack);

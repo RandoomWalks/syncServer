@@ -22,8 +22,10 @@ export class GoClientService {
 
   async syncData(data: ChangeDto[]): Promise<any> {
     this.logger.log('Sending data to Go service');
+    console.log('Sending data to Go service');
     const response = await this.httpService.post('http://go-service:8080/sync', { data }).toPromise();
     this.logger.log('Received response from Go service');
+    console.log('Received response from Go service');
     return response.data;
   }
 }

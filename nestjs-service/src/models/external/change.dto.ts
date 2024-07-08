@@ -10,4 +10,5 @@ export interface ChangeDto {
   clientId: string;
   text?: string;
   length?: number;
+  updatedAt?: Date;
 }

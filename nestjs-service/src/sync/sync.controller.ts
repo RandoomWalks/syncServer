@@ -36,7 +36,7 @@ export class SyncController {
 
         // Add logging to check the structure
         console.log('Received changeDtos:', changeDtos);
-
+ 
         try {
             await this.changeProcessorService.processClientChanges(changeDtos);
             this.logger.log('Client changes processed successfully');

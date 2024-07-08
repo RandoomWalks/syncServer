@@ -132,7 +132,7 @@ export class ChangeProcessorService {
             // });
 
             await collection.bulkWrite(bulkOps);
-            operations.forEach(op => this.otDocument.applyOperation(op));
+            operations.forEach(op => this.otDocument.applyOperation(op));   
 
             bulkOps.forEach(op => {
                 console.log(`updatedAt for clientId ${op.updateOne.filter._id}: ${op.updateOne.update.$set.updatedAt}`);

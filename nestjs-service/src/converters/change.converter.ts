@@ -86,10 +86,10 @@ export class ChangeConverter {
    * @param doc The ChangeDocument retrieved from MongoDB.
    * @returns A ChangeDto object representing external data format.
    */
-  static toExternal(doc: ChangeDocument): ChangeDto {
+static toExternal(doc: ChangeDocument): ChangeDto {
     return {
       ...doc,
-      clientId: doc._id.toHexString(), // Convert MongoDB's _id to clientId as hexadecimal string
+      clientId: doc._id.toString(), // Convert MongoDB's _id to clientId as hexadecimal string
       updatedAt: doc.updatedAt.toISOString(), // Format updatedAt Date object as ISO 8601 string
     };
   }

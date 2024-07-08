@@ -11,5 +11,5 @@ export interface ChangeDocument {
     clientId: string;
     text?: string;
     length?: number;
-    updatedAt?: string;
+    updatedAt: Date; // Date object for MongoDB
   }

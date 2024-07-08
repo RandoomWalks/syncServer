@@ -61,16 +61,24 @@ export class SyncController {
         console.log('Received request for server changes');
         this.logger.debug(`Query parameter 'since': ${since}`);
         console.log(`Query parameter 'since': ${since}`);
-        const changesSince = new Date(since);
-        if (isNaN(changesSince.getTime())) {
-            this.logger.error('Invalid date format');
-            console.error('Invalid date format');
+        // const changesSince = new Date(since);
+
+        if (!since || isNaN(Date.parse(since))) {
             throw new Error('Invalid time value');
         }
+        // if (isNaN(changesSince.getTime())) {
+        //     this.logger.error('Invalid date format');
+        //     console.error('Invalid date format');
+        //     throw new Error('Invalid time value');
+        // }
         try {
-            this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
-            console.log(`Parsed date: ${changesSince.toISOString()}`);
-            const changes: ChangeDto[] = await this.changeProcessorService.getServerChanges(changesSince);
+            const sinceDate = new Date(since);
+
+            // this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
+            // console.log(`Parsed date: ${changesSince.toISOString()}`);
+            // return [];
+            console.log('Calling changeProcessorService.getServerChanges');
+            const changes: ChangeDto[] = await this.changeProcessorService.getServerChanges(sinceDate);
             this.logger.log('Server changes retrieved successfully');
             console.log('Server changes retrieved successfully:', changes);
             return changes;

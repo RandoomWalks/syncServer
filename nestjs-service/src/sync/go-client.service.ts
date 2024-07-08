@@ -21,6 +21,12 @@ export class GoClientService {
   constructor(private readonly httpService: HttpService) { }
 
   async syncData(data: ChangeDto[]): Promise<any> {
+    // Ensure all data items have updatedAt as ISO string
+    data = data.map(item => ({
+      ...item,
+      updatedAt: item.updatedAt || new Date().toISOString()
+    }));
+    
     this.logger.log('Sending data to Go service');
     console.log('Sending data to Go service');
     const response = await this.httpService.post('http://go-service:8080/sync', { data }).toPromise();

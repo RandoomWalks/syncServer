@@ -36,6 +36,54 @@ export class ChangeProcessorService {
     }
 
 
+    // async processClientChanges(changeDtos: ChangeDto[]): Promise<void> {
+    //     this.logger.log('Processing client changes');
+    //     console.log('changeDtos:', changeDtos); // Log the received changeDtos
+
+    //     const operations: Operation[] = changeDtos.map(ChangeConverter.toInternal);
+    //     console.log('operations:', operations); // Log the converted operations
+
+    //     try {
+    //         const db: Db = await this.databaseService.getDb();
+    //         const collection = db.collection<ChangeDocument>('client-changes');
+
+    //         // Apply operations and prepare bulk operations for the database
+    //         const bulkOps = operations.map(operation => {
+    //             // Ensure clientId is a valid ObjectId
+    //             let clientId;
+    //             if (ObjectId.isValid(operation.clientId)) {
+    //                 clientId = new ObjectId(operation.clientId);
+    //             } else {
+    //                 this.logger.warn(`Invalid ObjectId format for clientId: ${operation.clientId}, generating a new ObjectId`);
+
+    //                 clientId = new ObjectId(); // Generate a valid ObjectId if necessary
+    //                 // throw new Error(`Invalid ObjectId format for clientId: ${operation.clientId}`);
+    //             }
+
+    //             this.otDocument.applyOperation(operation);
+
+    //             return {
+    //                 updateOne: {
+    //                     filter: { _id: clientId },
+    //                     update: { $set: { ...operation, clientId, vectorClock: operation.vectorClock, updatedAt: operation.updatedAt } },
+    //                     upsert: true,
+    //                 },
+    //             };
+    //         });
+
+    //         await collection.bulkWrite(bulkOps);
+
+    //         bulkOps.forEach(op => {
+    //             console.log(`updatedAt for clientId ${op.updateOne.filter._id}: ${op.updateOne.update.$set.updatedAt}`);
+    //             // console.log(`${op.updateOne.update.$set.updatedAt}`)
+    //         })
+
+    //         this.logger.log('Client changes processed successfully');
+    //     } catch (error) {
+    //         this.logger.error('Error processing client changes', error.stack);
+    //         throw error;
+    //     }
+    // }
     async processClientChanges(changeDtos: ChangeDto[]): Promise<void> {
         this.logger.log('Processing client changes');
         console.log('changeDtos:', changeDtos); // Log the received changeDtos
@@ -43,35 +91,48 @@ export class ChangeProcessorService {
         const operations: Operation[] = changeDtos.map(ChangeConverter.toInternal);
         console.log('operations:', operations); // Log the converted operations
 
+        const documents: ChangeDocument[] = operations.map(ChangeConverter.toDocument);
+        console.log('documents:', documents); // Log the converted documents
+
         try {
             const db: Db = await this.databaseService.getDb();
             const collection = db.collection<ChangeDocument>('client-changes');
 
             // Apply operations and prepare bulk operations for the database
-            const bulkOps = operations.map(operation => {
-                // Ensure clientId is a valid ObjectId
-                let clientId;
-                if (ObjectId.isValid(operation.clientId)) {
-                    clientId = new ObjectId(operation.clientId);
-                } else {
-                    this.logger.warn(`Invalid ObjectId format for clientId: ${operation.clientId}, generating a new ObjectId`);
+            const bulkOps = documents.map(doc => ({
+                updateOne: {
+                  filter: { _id: doc._id },
+                  update: { $set: doc },
+                  upsert: true,
+                },
+              }));
+              
 
-                    clientId = new ObjectId(); // Generate a valid ObjectId if necessary
-                    // throw new Error(`Invalid ObjectId format for clientId: ${operation.clientId}`);
-                }
+            // const bulkOps = operations.map(operation => {
+            //     // Ensure clientId is a valid ObjectId
+            //     let clientId;
+            //     if (ObjectId.isValid(operation.clientId)) {
+            //         clientId = new ObjectId(operation.clientId);
+            //     } else {
+            //         this.logger.warn(`Invalid ObjectId format for clientId: ${operation.clientId}, generating a new ObjectId`);
 
-                this.otDocument.applyOperation(operation);
+            //         clientId = new ObjectId(); // Generate a valid ObjectId if necessary
+            //         // throw new Error(`Invalid ObjectId format for clientId: ${operation.clientId}`);
+            //     }
 
-                return {
-                    updateOne: {
-                        filter: { _id: clientId },
-                        update: { $set: { ...operation, clientId, vectorClock: operation.vectorClock, updatedAt: operation.updatedAt } },
-                        upsert: true,
-                    },
-                };
-            });
+            //     this.otDocument.applyOperation(operation);
+
+            //     return {
+            //         updateOne: {
+            //             filter: { _id: clientId },
+            //             update: { $set: { ...operation, clientId, vectorClock: operation.vectorClock, updatedAt: operation.updatedAt } },
+            //             upsert: true,
+            //         },
+            //     };
+            // });
 
             await collection.bulkWrite(bulkOps);
+            operations.forEach(op => this.otDocument.applyOperation(op));
 
             bulkOps.forEach(op => {
                 console.log(`updatedAt for clientId ${op.updateOne.filter._id}: ${op.updateOne.update.$set.updatedAt}`);
@@ -94,11 +155,12 @@ export class ChangeProcessorService {
 
             // const changes: ChangeDocument[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
             const changes: ChangeDocument[] = await collection
-                .find({ updatedAt: { $gt: since.valueOf().toString() } })    // selects documents where the updatedAt field value is greater than since.
+                .find({ updatedAt: { $gt: since } })
                 .sort({ updatedAt: 1 }) // sorted chronologically, starting from the earliest.
                 .toArray() || [];
 
             console.log("getServerChanges() changes ChangeDocument[]:", changes);
+            
             // Convert the documents to ChangeDto
             return changes.map(doc => {
                 let transformedChange = ChangeConverter.toExternal(doc);

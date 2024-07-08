@@ -10,5 +10,5 @@ export interface ChangeDto {
   clientId: string;
   text?: string;
   length?: number;
-  updatedAt?: Date;
+  updatedAt?: string; // ISO 8601 string
 }

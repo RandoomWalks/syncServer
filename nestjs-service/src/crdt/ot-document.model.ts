@@ -11,7 +11,7 @@ export interface Operation {
     length?: number;
     vectorClock: VectorClock;
     clientId: string;
-    updatedAt: string;
+    updatedAt: string; // ISO 8601 string
 }
 
 
@@ -73,9 +73,13 @@ export class OTDocument {
     }
 
     public applyOperation(op: Operation): void {
+        op.updatedAt = op.updatedAt || new Date().toISOString();
+        console.log("BEFORE applyOperation(): ");
+
         const transformedOp = this.transformOperation(op);
         this.doc = this._applyOperation(this.doc, transformedOp);
         this.operations.push(transformedOp);
+        console.log("AFTER applyOperation(): ",transformedOp);
     }
 
     public getDocument(): string {

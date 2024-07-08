@@ -15,11 +15,13 @@ export class ServerChangeTrackerService {
 
     async trackChange(changeDto: ChangeDto): Promise<void> {
         this.logger.log('Tracking change');
-        const change: ChangeDocument = {
-            ...ChangeConverter.toInternal(changeDto),
-            _id:new ObjectId(), 
-            updatedAt:new Date().valueOf().toString(),
-        }
+        const change: ChangeDocument = ChangeConverter.toDocument(ChangeConverter.toInternal(changeDto));
+
+        // const change: ChangeDocument = {
+        //     ...ChangeConverter.toInternal(changeDto),
+        //     _id:new ObjectId(), 
+        //     updatedAt:new Date().valueOf().toString(),
+        // }
 
         try {
             const db = await this.databaseService.getDb();
@@ -36,7 +38,9 @@ export class ServerChangeTrackerService {
         this.logger.log('Retrieving changes since timestamp');
         try {
             const db = await this.databaseService.getDb();
+
             const collection = db.collection<ChangeDocument>('change-tracker');
+            
             const changes:ChangeDocument[] = await collection.find({ timestamp: { $gt: timestamp } }).toArray();
             if (!changes) {
                 throw new Error('Failed to retrieve changes from the database');

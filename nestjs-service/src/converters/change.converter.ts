@@ -2,8 +2,6 @@
 import { ChangeDto } from '../models/external/change.dto';
 import { ChangeDocument } from '../models/internal/change.model';
 import { Operation } from '../crdt/ot-document.model';
-
-
 import { ObjectId } from 'mongodb';
 
 

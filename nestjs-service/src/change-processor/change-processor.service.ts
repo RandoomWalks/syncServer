@@ -93,43 +93,29 @@ export class ChangeProcessorService {
     async getServerChanges(since: Date, clientVC?: VectorClock): Promise<any> {
         this.logger.log('Retrieving server changes');
         try {
-            this.logger.log("getServerChanges() START get changes since:", since);
+            console.log("getServerChanges() START get changes since:", since);
             const db: Db = await this.databaseService.getDb();
             const collection = db.collection<ChangeDocument>('client-changes');
             let changes: ChangeDocument[] = [];
 
-            if (clientVC) {
+            if (clientVC && Object.keys(clientVC).length > 0) {
                 changes = await this.getChangesSinceVC(clientVC);
-
-                // changes = changes.filter(change => 
-                //     this.isChangeNewerThanVectorClock(change.vectorClock, clientVC)
-                // );
             } else {
-
-                // const changes: ChangeDocument[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
                 changes = await collection
                     .find({ updatedAt: { $gt: since } })
-                    .sort({ updatedAt: 1 }) // sorted chronologically, starting from the earliest.
+                    .sort({ updatedAt: 1 })
                     .toArray() || [];
             }
 
+            console.log("getServerChanges() changes ChangeDocument[]:", changes);
+            let changesObj = changes.map(doc => ChangeConverter.toExternal(doc));
 
-            this.logger.log("getServerChanges() changes ChangeDocument[]:", changes);
-            let changesObj = changes.map(doc => {
-                let transformedChange = ChangeConverter.toExternal(doc);
-                this.logger.log("getServerChanges() transformedChange:", transformedChange);
-                return transformedChange; // returns the result of converting each ChangeDocument (doc) to a ChangeDto
-            });
-
-            // Convert the documents to ChangeDto
             return { changes: changesObj, serverVC: this.otDocument.getServerVC() };
-
         } catch (error) {
-            this.logger.error('Error retrieving server changes', error.stack);
+            this.logger.error('Error retrieving server changes', error);
             throw error;
         }
     }
-
 
     private async getChangesSinceVC(clientVC: VectorClock): Promise<ChangeDocument[]> {
         const db: Db = await this.databaseService.getDb();

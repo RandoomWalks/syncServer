@@ -1,8 +1,8 @@
-import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Logger, ValidationPipe,BadRequestException } from '@nestjs/common';
 import { ChangeProcessorService } from '../change-processor/change-processor.service';
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
 import { GoClientService } from './go-client.service';
-import { ChangeDto } from '../models/external/change.dto';
+import { ChangeDto, ServerChangesQueryDto } from '../models/external/change.dto';
 import { OTDocument, Operation, VectorClock } from '../crdt/ot-document.model';
 
 @Controller('sync')
@@ -29,21 +29,21 @@ export class SyncController {
      * ]
      */
     @Post('client-changes')
-    async receiveClientChanges(@Body() changeDtos: ChangeDto[]): Promise<any> {
-        console.log('Received client changes');
-        console.debug(`Client changes data: ${JSON.stringify(changeDtos)}`);
-    
+    async receiveClientChanges(@Body(new ValidationPipe({ transform: true, forbidUnknownValues: true })) changeDtos: ChangeDto[]): Promise<any> {
+        this.logger.log('Received client changes');
+        this.logger.debug(`Client changes data: ${JSON.stringify(changeDtos)}`);
+
         if (!changeDtos || changeDtos.length === 0) {
-            console.warn('No changes received');
+            this.logger.warn('No changes received');
             return { success: false, message: 'No changes received' };
         }
-    
+
         try {
             const result = await this.changeProcessorService.processClientChanges(changeDtos);
-            console.log('Client changes processed successfully');
+            this.logger.log('Client changes processed successfully');
             return { success: true, message: 'Client changes processed successfully' };
         } catch (error) {
-            console.error('Error processing client changes', error);
+            this.logger.error('Error processing client changes', error);
             return { success: false, message: 'Error processing client changes', error: error.message };
         }
     }
@@ -53,39 +53,33 @@ export class SyncController {
      * Example Request: GET /sync/server-changes?since=2023-01-01T00:00:00Z
      */
     @Get('server-changes')
-    async sendServerChanges(
-        @Query('since') since?: string,
-        @Query('vectorClock') vectorClockString?: string
-    ): Promise<any> {
-        console.log('Received request for server changes');
-        console.debug(`Query parameter 'since': ${since}`);
-        console.debug(`Query parameter 'vectorClock': ${vectorClockString}`);
-    
-        let sinceDate: Date = new Date(0); // Default to epoch if not provided
-        let vectorClock: VectorClock | undefined;
-    
-        if (since && !isNaN(Date.parse(since))) {
-            sinceDate = new Date(since);
+    async sendServerChanges(@Query(new ValidationPipe({ transform: true, forbidUnknownValues: true })) query: ServerChangesQueryDto): Promise<any> {
+        this.logger.log('Received request for server changes');
+        this.logger.debug(`Query: ${JSON.stringify(query)}`);
+
+        let sinceDate: Date = new Date(0);
+        let vectorClock: Record<string, number> | undefined;
+
+        if (query.since) {
+            sinceDate = new Date(query.since);
         }
-    
-        if (vectorClockString) {
+
+        if (query.vectorClock) {
             try {
-                vectorClock = JSON.parse(vectorClockString);
+                vectorClock = JSON.parse(query.vectorClock);
             } catch (error) {
-                console.error('Error parsing vectorClock', error);
-                // You might want to handle this error, perhaps by setting vectorClock to undefined
+                this.logger.error('Error parsing vectorClock', error);
+                return { success: false, message: 'Invalid vectorClock format' };
             }
         }
-    
+
         try {
-            console.debug('Calling changeProcessorService.getServerChanges');
             const { changes, serverVC } = await this.changeProcessorService.getServerChanges(sinceDate, vectorClock);
-    
-            console.log('Server changes retrieved successfully');
-            return { changes, serverVC };
+            this.logger.log('Server changes retrieved successfully');
+            return { success: true, changes, serverVC };
         } catch (error) {
-            console.error('Error retrieving server changes', error);
-            throw error;
+            this.logger.error('Error retrieving server changes', error);
+            return { success: false, message: 'Error retrieving server changes', error: error.message };
         }
     }
 

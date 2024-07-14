@@ -3,6 +3,7 @@ import { ChangeProcessorService } from '../change-processor/change-processor.ser
 import { ServerChangeTrackerService } from '../server-change-tracker/server-change-tracker.service';
 import { GoClientService } from './go-client.service';
 import { ChangeDto } from '../models/external/change.dto';
+import { OTDocument, Operation, VectorClock } from '../crdt/ot-document.model';
 
 @Controller('sync')
 export class SyncController {
@@ -29,25 +30,21 @@ export class SyncController {
      */
     @Post('client-changes')
     async receiveClientChanges(@Body() changeDtos: ChangeDto[]): Promise<any> {
-        this.logger.log('Received client changes');
         console.log('Received client changes');
-        this.logger.debug(`Client changes data: ${JSON.stringify(changeDtos)}`);
-        console.log(`Client changes data: ${JSON.stringify(changeDtos)}`);
-
-        // Add logging to check the structure
-        console.log('Received changeDtos:', changeDtos);
- 
+        console.debug(`Client changes data: ${JSON.stringify(changeDtos)}`);
+    
+        if (!changeDtos || changeDtos.length === 0) {
+            console.warn('No changes received');
+            return { success: false, message: 'No changes received' };
+        }
+    
         try {
-            await this.changeProcessorService.processClientChanges(changeDtos);
-            this.logger.log('Client changes processed successfully');
+            const result = await this.changeProcessorService.processClientChanges(changeDtos);
             console.log('Client changes processed successfully');
             return { success: true, message: 'Client changes processed successfully' };
         } catch (error) {
-            this.logger.error('Error processing client changes', error.stack);
-            console.error('Error processing client changes', error.stack);
-            // throw error;
+            console.error('Error processing client changes', error);
             return { success: false, message: 'Error processing client changes', error: error.message };
-
         }
     }
 
@@ -56,35 +53,38 @@ export class SyncController {
      * Example Request: GET /sync/server-changes?since=2023-01-01T00:00:00Z
      */
     @Get('server-changes')
-    async sendServerChanges(@Query('since') since: string): Promise<ChangeDto[]> {
-        this.logger.log('Received request for server changes');
+    async sendServerChanges(
+        @Query('since') since?: string,
+        @Query('vectorClock') vectorClockString?: string
+    ): Promise<any> {
         console.log('Received request for server changes');
-        this.logger.debug(`Query parameter 'since': ${since}`);
-        console.log(`Query parameter 'since': ${since}`);
-        // const changesSince = new Date(since);
-
-        if (!since || isNaN(Date.parse(since))) {
-            throw new Error('Invalid time value');
+        console.debug(`Query parameter 'since': ${since}`);
+        console.debug(`Query parameter 'vectorClock': ${vectorClockString}`);
+    
+        let sinceDate: Date = new Date(0); // Default to epoch if not provided
+        let vectorClock: VectorClock | undefined;
+    
+        if (since && !isNaN(Date.parse(since))) {
+            sinceDate = new Date(since);
         }
-        // if (isNaN(changesSince.getTime())) {
-        //     this.logger.error('Invalid date format');
-        //     console.error('Invalid date format');
-        //     throw new Error('Invalid time value');
-        // }
+    
+        if (vectorClockString) {
+            try {
+                vectorClock = JSON.parse(vectorClockString);
+            } catch (error) {
+                console.error('Error parsing vectorClock', error);
+                // You might want to handle this error, perhaps by setting vectorClock to undefined
+            }
+        }
+    
         try {
-            const sinceDate = new Date(since);
-
-            // this.logger.debug(`Parsed date: ${changesSince.toISOString()}`);
-            // console.log(`Parsed date: ${changesSince.toISOString()}`);
-            // return [];
-            console.log('Calling changeProcessorService.getServerChanges');
-            const changes: ChangeDto[] = await this.changeProcessorService.getServerChanges(sinceDate);
-            this.logger.log('Server changes retrieved successfully');
-            console.log('Server changes retrieved successfully:', changes);
-            return changes;
+            console.debug('Calling changeProcessorService.getServerChanges');
+            const { changes, serverVC } = await this.changeProcessorService.getServerChanges(sinceDate, vectorClock);
+    
+            console.log('Server changes retrieved successfully');
+            return { changes, serverVC };
         } catch (error) {
-            this.logger.error('Error retrieving server changes', error.stack);
-            console.error('Error retrieving server changes', error.stack);
+            console.error('Error retrieving server changes', error);
             throw error;
         }
     }
@@ -118,22 +118,16 @@ export class SyncController {
      */
     @Post('reset-document')
     async resetDocument(@Body() body: { initialDocument: string }): Promise<any> {
-        this.logger.log('Received request to reset document');
         console.log('Received request to reset document');
-        this.logger.debug(`Initial document: ${body.initialDocument}`);
-        console.log(`Initial document: ${body.initialDocument}`);
+        console.debug(`Initial document: ${body.initialDocument}`);
 
         try {
             await this.changeProcessorService.resetDocument(body.initialDocument);
-            this.logger.log('Document reset successfully');
             console.log('Document reset successfully');
             return { success: true, message: 'Document reset successfully' };
         } catch (error) {
-            this.logger.error('Error resetting document', error.stack);
             console.error('Error resetting document', error.stack);
             return { success: false, message: 'Error processing Document reset', error: error.message };
-
-            // throw error;
         }
     }
 
@@ -152,22 +146,16 @@ export class SyncController {
      */
     @Post('apply-operation')
     async applyOperation(@Body() body: { operation: ChangeDto }): Promise<any> {
-        this.logger.log('Received request to apply operation');
         console.log('Received request to apply operation');
-        this.logger.debug(`Operation data: ${JSON.stringify(body.operation)}`);
-        console.log(`Operation data: ${JSON.stringify(body.operation)}`);
+        console.debug(`Operation data: ${JSON.stringify(body.operation)}`);
 
         try {
             await this.changeProcessorService.applyOperation(body.operation);
-            this.logger.log('Operation applied successfully');
             console.log('Operation applied successfully');
             return { success: true, message: 'Operation applied successfully' };
         } catch (error) {
-            this.logger.error('Error applying operation', error.stack);
             console.error('Error applying operation', error.stack);
             return { success: false, message: 'Operation apply Error', error: error.message };
-
-            // throw error;
         }
     }
 
@@ -177,20 +165,15 @@ export class SyncController {
      */
     @Get('document')
     async getDocument(): Promise<any> {
-        this.logger.log('Received request to get current document');
         console.log('Received request to get current document');
 
         try {
             const document = await this.changeProcessorService.getDocument();
-            this.logger.log('Current document retrieved successfully');
             console.log('Current document retrieved successfully');
             return { success: true, document };
         } catch (error) {
-            this.logger.error('Error retrieving document', error.stack);
             console.error('Error retrieving document', error.stack);
-            return { success: true, message: 'Error retrieving document', error: error.message };
-
-            // throw error;
+            return { success: false, message: 'Error retrieving document', error: error.message };
         }
     }
 }

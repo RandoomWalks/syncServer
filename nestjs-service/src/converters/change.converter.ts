@@ -3,45 +3,9 @@ import { ChangeDto } from '../models/external/change.dto';
 import { ChangeDocument } from '../models/internal/change.model';
 import { Operation } from '../crdt/ot-document.model';
 
-// export class ChangeConverter {
-
-//   static toInternal(changeDto: ChangeDto): Operation {
-//     // type, position, vectorClock, and clientId are directly copied from ChangeDto to Operation.
-//     // For optional fields (text, length, updatedAt), the method checks if they are present in changeDto before including them in the returned object.
-//     return {
-//       type: changeDto.type,
-//       position: changeDto.position,
-//       vectorClock: changeDto.vectorClock,
-//       clientId: changeDto.clientId,
-//       updatedAt: changeDto.updatedAt || new Date().toISOString(),
-//       ...(changeDto.text && { text: changeDto.text }),
-//       ...(changeDto.length && { length: changeDto.length }),
-//     };
-//   }
-  
-//   static toDocument(operation: Operation): ChangeDocument {
-//     return {
-//       ...operation,
-//       _id: new ObjectId(operation.clientId),
-//       updatedAt: new Date(operation.updatedAt),
-//     };
-//   }
-
-//   static toExternal(doc: ChangeDocument): ChangeDto {
-//     return {
-//       type: doc.type,
-//       position: doc.position,
-//       vectorClock: doc.vectorClock,
-//       clientId: doc._id.toHexString(),
-//       text: doc.text,
-//       length: doc.length,
-//       updatedAt: doc.updatedAt.toISOString(),
-//     };
-//   }
-// }
-
 
 import { ObjectId } from 'mongodb';
+
 
 /**
  * Utility class for converting between internal and external representations of changes,
@@ -75,7 +39,8 @@ export class ChangeConverter {
   static toDocument(operation: Operation): ChangeDocument {
     return {
       ...operation,
-      _id: new ObjectId(operation.clientId), // Convert clientId to MongoDB's ObjectId format
+      _id:new ObjectId(), // Generate a new ObjectId for the document
+      clientId: operation.clientId, // keep clientId as string
       updatedAt: new Date(operation.updatedAt), // Parse updatedAt from ISO 8601 string to Date object
     };
   }
@@ -89,8 +54,72 @@ export class ChangeConverter {
 static toExternal(doc: ChangeDocument): ChangeDto {
     return {
       ...doc,
-      clientId: doc._id.toString(), // Convert MongoDB's _id to clientId as hexadecimal string
+      clientId: doc.clientId.toString(), // Convert MongoDB's _id to clientId as hexadecimal string
       updatedAt: doc.updatedAt.toISOString(), // Format updatedAt Date object as ISO 8601 string
     };
   }
 }
+
+
+// ### Example: Complex Conversion Chain (`ChangeDto` to `ChangeDocument` to `ChangeDto`)
+
+// 1. **Convert `ChangeDto` to `Operation`**:
+
+// ```typescript
+// const changeDto4: ChangeDto = {
+//   type: "delete",
+//   position: 15,
+//   vectorClock: { "client2": 5, "client3": 2 },
+//   clientId: "client2",
+//   length: 7
+// };
+
+// const operation4: Operation = ChangeConverter.toInternal(changeDto4);
+// console.log(operation4);
+// /* Output:
+// {
+//   type: 'delete',
+//   position: 15,
+//   vectorClock: { client2: 5, client3: 2 },
+//   clientId: 'client2',
+//   length: 7,
+//   updatedAt: '2024-07-10T12:34:56.789Z' // Assuming current timestamp
+// }
+// */
+// ```
+
+// 2. **Convert `Operation` to `ChangeDocument`**:
+
+// ```typescript
+// const changeDocument4: ChangeDocument = ChangeConverter.toDocument(operation4);
+// console.log(changeDocument4);
+// /* Output:
+// {
+//   _id: ObjectId("..."), // Newly generated ObjectId
+//   type: 'delete',
+//   position: 15,
+//   vectorClock: { client2: 5, client3: 2 },
+//   clientId: 'client2',
+//   length: 7,
+//   updatedAt: 2024-07-10T12:34:56.789Z // Date object
+// }
+// */
+// ```
+
+// 3. **Convert `ChangeDocument` back to `ChangeDto`**:
+
+// ```typescript
+// const changeDtoConvertedBack: ChangeDto = ChangeConverter.toExternal(changeDocument4);
+// console.log(changeDtoConvertedBack);
+// /* Output:
+// {
+//   type: 'delete',
+//   position: 15,
+//   vectorClock: { client2: 5, client3: 2 },
+//   clientId: '...', // Hexadecimal string representation of ObjectId
+//   length: 7,
+//   updatedAt: '2024-07-10T12:34:56.789Z' // ISO 8601 string
+// }
+// */
+// ```
+

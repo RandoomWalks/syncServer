@@ -21,7 +21,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
 
 
-
     async onModuleInit(): Promise<void> {
         // const uri = process.env.LOCAL_DATABASE_URL || 'mongodb://mongo:27017/mydb';
         const uri = this.configService.get<string>('MONGO_URI');
@@ -66,7 +65,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     private async createIndexes(): Promise<void> {
         const collection = this.db.collection('client-changes');
         await collection.createIndex({ updatedAt: 1 });
-        await collection.createIndex({ 'data._id': 1 });
+        await collection.createIndex({ clientId: 1 });
     }
 }
 

@@ -7,6 +7,7 @@ import { ChangeDto } from '../models/external/change.dto';
 import { Db, MongoServerError, ObjectId, WithId } from 'mongodb';
 import { OTDocument, Operation, VectorClock } from '../crdt/ot-document.model';
 
+
 @Injectable()
 export class ChangeProcessorService {
     private readonly logger = new Logger(ChangeProcessorService.name);
@@ -35,64 +36,29 @@ export class ChangeProcessorService {
         return this.otDocument.getDocument();
     }
 
+    private isClientOutOfSync(clientVC: VectorClock): boolean {
+        const serverVC = this.otDocument.getServerVC();
+        return Object.entries(serverVC).some(([clientId, count]) =>
+            (clientVC[clientId] || 0) < count
+        );
+    }
 
-    // async processClientChanges(changeDtos: ChangeDto[]): Promise<void> {
-    //     this.logger.log('Processing client changes');
-    //     console.log('changeDtos:', changeDtos); // Log the received changeDtos
-
-    //     const operations: Operation[] = changeDtos.map(ChangeConverter.toInternal);
-    //     console.log('operations:', operations); // Log the converted operations
-
-    //     try {
-    //         const db: Db = await this.databaseService.getDb();
-    //         const collection = db.collection<ChangeDocument>('client-changes');
-
-    //         // Apply operations and prepare bulk operations for the database
-    //         const bulkOps = operations.map(operation => {
-    //             // Ensure clientId is a valid ObjectId
-    //             let clientId;
-    //             if (ObjectId.isValid(operation.clientId)) {
-    //                 clientId = new ObjectId(operation.clientId);
-    //             } else {
-    //                 this.logger.warn(`Invalid ObjectId format for clientId: ${operation.clientId}, generating a new ObjectId`);
-
-    //                 clientId = new ObjectId(); // Generate a valid ObjectId if necessary
-    //                 // throw new Error(`Invalid ObjectId format for clientId: ${operation.clientId}`);
-    //             }
-
-    //             this.otDocument.applyOperation(operation);
-
-    //             return {
-    //                 updateOne: {
-    //                     filter: { _id: clientId },
-    //                     update: { $set: { ...operation, clientId, vectorClock: operation.vectorClock, updatedAt: operation.updatedAt } },
-    //                     upsert: true,
-    //                 },
-    //             };
-    //         });
-
-    //         await collection.bulkWrite(bulkOps);
-
-    //         bulkOps.forEach(op => {
-    //             console.log(`updatedAt for clientId ${op.updateOne.filter._id}: ${op.updateOne.update.$set.updatedAt}`);
-    //             // console.log(`${op.updateOne.update.$set.updatedAt}`)
-    //         })
-
-    //         this.logger.log('Client changes processed successfully');
-    //     } catch (error) {
-    //         this.logger.error('Error processing client changes', error.stack);
-    //         throw error;
-    //     }
-    // }
-    async processClientChanges(changeDtos: ChangeDto[]): Promise<void> {
+    async processClientChanges(changeDtos: ChangeDto[]): Promise<{ accepted: boolean, changes?: ChangeDto[] }> {
         this.logger.log('Processing client changes');
-        console.log('changeDtos:', changeDtos); // Log the received changeDtos
+        this.logger.log('changeDtos:', changeDtos); // Log the received changeDtos
 
         const operations: Operation[] = changeDtos.map(ChangeConverter.toInternal);
-        console.log('operations:', operations); // Log the converted operations
+        this.logger.log('operations:', operations); // Log the converted operations
 
         const documents: ChangeDocument[] = operations.map(ChangeConverter.toDocument);
-        console.log('documents:', documents); // Log the converted documents
+        this.logger.log('documents:', documents); // Log the converted documents
+
+        const clientVC = changeDtos[0].vectorClock; // Assuming all changes have the same vector clock
+        if (this.isClientOutOfSync(clientVC)) {
+            const missingChanges: ChangeDocument[] = await this.getChangesSinceVC(clientVC);
+
+            return { accepted: false, changes: missingChanges.map(ChangeConverter.toExternal) };
+        }
 
         try {
             const db: Db = await this.databaseService.getDb();
@@ -101,42 +67,20 @@ export class ChangeProcessorService {
             // Apply operations and prepare bulk operations for the database
             const bulkOps = documents.map(doc => ({
                 updateOne: {
-                  filter: { _id: doc._id },
-                  update: { $set: doc },
-                  upsert: true,
+                    filter: { _id: doc._id },
+                    update: { $set: doc },
+                    upsert: true,
                 },
-              }));
-              
-
-            // const bulkOps = operations.map(operation => {
-            //     // Ensure clientId is a valid ObjectId
-            //     let clientId;
-            //     if (ObjectId.isValid(operation.clientId)) {
-            //         clientId = new ObjectId(operation.clientId);
-            //     } else {
-            //         this.logger.warn(`Invalid ObjectId format for clientId: ${operation.clientId}, generating a new ObjectId`);
-
-            //         clientId = new ObjectId(); // Generate a valid ObjectId if necessary
-            //         // throw new Error(`Invalid ObjectId format for clientId: ${operation.clientId}`);
-            //     }
-
-            //     this.otDocument.applyOperation(operation);
-
-            //     return {
-            //         updateOne: {
-            //             filter: { _id: clientId },
-            //             update: { $set: { ...operation, clientId, vectorClock: operation.vectorClock, updatedAt: operation.updatedAt } },
-            //             upsert: true,
-            //         },
-            //     };
-            // });
+            }));
 
             await collection.bulkWrite(bulkOps);
-            operations.forEach(op => this.otDocument.applyOperation(op));   
+            operations.forEach(op => this.otDocument.applyOperation(op));
+
+            // this.serverVectorClock = this.otDocument.mergeVectorClocks(this.serverVectorClock, operation.vectorClock);
 
             bulkOps.forEach(op => {
-                console.log(`updatedAt for clientId ${op.updateOne.filter._id}: ${op.updateOne.update.$set.updatedAt}`);
-                // console.log(`${op.updateOne.update.$set.updatedAt}`)
+                this.logger.log(`updatedAt for clientId ${op.updateOne.filter._id}: ${op.updateOne.update.$set.updatedAt}`);
+                // this.logger.log(`${op.updateOne.update.$set.updatedAt}`)
             })
 
             this.logger.log('Client changes processed successfully');
@@ -146,31 +90,64 @@ export class ChangeProcessorService {
         }
     }
 
-    async getServerChanges(since: Date): Promise<ChangeDto[]> {
+    async getServerChanges(since: Date, clientVC?: VectorClock): Promise<any> {
         this.logger.log('Retrieving server changes');
         try {
-            console.log("getServerChanges() START get changes since:", since);
+            this.logger.log("getServerChanges() START get changes since:", since);
             const db: Db = await this.databaseService.getDb();
             const collection = db.collection<ChangeDocument>('client-changes');
+            let changes: ChangeDocument[] = [];
 
-            // const changes: ChangeDocument[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
-            const changes: ChangeDocument[] = await collection
-                .find({ updatedAt: { $gt: since } })
-                .sort({ updatedAt: 1 }) // sorted chronologically, starting from the earliest.
-                .toArray() || [];
+            if (clientVC) {
+                changes = await this.getChangesSinceVC(clientVC);
 
-            console.log("getServerChanges() changes ChangeDocument[]:", changes);
-            
-            // Convert the documents to ChangeDto
-            return changes.map(doc => {
+                // changes = changes.filter(change => 
+                //     this.isChangeNewerThanVectorClock(change.vectorClock, clientVC)
+                // );
+            } else {
+
+                // const changes: ChangeDocument[] = await collection.find({ updatedAt: { $gt: since } }).toArray() || [];
+                changes = await collection
+                    .find({ updatedAt: { $gt: since } })
+                    .sort({ updatedAt: 1 }) // sorted chronologically, starting from the earliest.
+                    .toArray() || [];
+            }
+
+
+            this.logger.log("getServerChanges() changes ChangeDocument[]:", changes);
+            let changesObj = changes.map(doc => {
                 let transformedChange = ChangeConverter.toExternal(doc);
-                console.log("getServerChanges() transformedChange:", transformedChange);
+                this.logger.log("getServerChanges() transformedChange:", transformedChange);
                 return transformedChange; // returns the result of converting each ChangeDocument (doc) to a ChangeDto
             });
+
+            // Convert the documents to ChangeDto
+            return { changes: changesObj, serverVC: this.otDocument.getServerVC() };
+
         } catch (error) {
             this.logger.error('Error retrieving server changes', error.stack);
             throw error;
         }
+    }
+
+
+    private async getChangesSinceVC(clientVC: VectorClock): Promise<ChangeDocument[]> {
+        const db: Db = await this.databaseService.getDb();
+        const collection = db.collection<ChangeDocument>('client-changes');
+        const serverVC = this.otDocument.getServerVC();
+
+        return collection.find({
+            $or: Object.entries(serverVC).map(([clientId, count]) => ({
+                clientId,
+                [`vectorClock.${clientId}`]: { $gt: clientVC[clientId] || 0 }
+            }))
+        }).sort({ updatedAt: 1 }).toArray();
+    }
+
+    private isChangeNewerThanVectorClock(changeVC: VectorClock, clientVC: VectorClock): boolean {
+        return Object.entries(changeVC).some(([clientId, count]) =>
+            (clientVC[clientId] || 0) < count
+        );
     }
 
     private generateVectorClock(): VectorClock {

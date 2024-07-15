@@ -15,7 +15,7 @@ async function bootstrap() {
     exceptionFactory: (errors) => new BadRequestException(errors),
   }));
   app.useGlobalFilters(new ValidationExceptionFilter());
-
+  
   
   app.enableCors({ origin: '*' });
   const port = process.env.PORT || 3000; // Use the PORT environment variable or default to 3000

@@ -43,6 +43,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
+    getClient():MongoClient {
+        if (!this.client) {
+            throw new Error('MongoClient is not initialized.');
+        }
+        return this.client;
+    }
+    
     getDb(): Db {
         if (!this.db) {
             throw new Error('Database connection is not initialized.');
